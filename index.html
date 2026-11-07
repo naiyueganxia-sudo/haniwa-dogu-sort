@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#1d1611" />
+    <title>はにわと土偶の仕分けゲーム</title>
+  </head>
+  <body>
+    <canvas id="game" aria-hidden="true"></canvas>
+
+    <div id="app">
+      <header id="hud" class="hud">
+        <div class="hud-score"><span class="hud-label">SCORE</span><span id="hud-score">0</span></div>
+        <div class="hud-combo" id="hud-combo-box">
+          <span id="hud-mult" class="hud-mult">×1.0</span>
+          <span id="hud-combo">0</span><span class="hud-label">COMBO</span>
+        </div>
+        <div class="hud-miss" aria-label="ミス">
+          <span class="hud-label">MISS</span>
+          <span class="miss-dot"></span><span class="miss-dot"></span><span class="miss-dot"></span>
+        </div>
+        <button id="btn-pause" class="icon-btn" aria-label="一時停止">
+          <svg viewBox="0 0 24 24" width="22" height="22"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
+        </button>
+      </header>
+      <div id="stage"></div>
+      <button id="btn-L" class="sort-btn sort-L" aria-label="はにわ（左）">
+        <span class="sort-arrow">◀</span><span class="sort-name">はにわ</span>
+      </button>
+      <button id="btn-R" class="sort-btn sort-R" aria-label="土偶（右）">
+        <span class="sort-name">土偶</span><span class="sort-arrow">▶</span>
+      </button>
+    </div>
+
+    <div id="milestone" class="milestone" hidden></div>
+
+    <!-- タイトル -->
+    <section id="scr-title" class="screen">
+      <div class="panel">
+        <p class="title-sub">ベルトコンベア出土品仕分け</p>
+        <h1 class="title">はにわと土偶の<br />仕分けゲーム</h1>
+        <div class="title-art"><canvas id="title-h" width="96" height="96"></canvas><span>？</span><canvas id="title-d" width="96" height="96"></canvas></div>
+        <button class="btn primary" data-act="start">スタート</button>
+        <button class="btn" data-act="howto">遊び方</button>
+        <button class="btn small" data-act="mute"><span class="mute-label">音：オン</span></button>
+        <p class="best">ベストスコア <span class="best-score">0</span></p>
+        <p class="hint-keys only-desktop">Enter / Space でスタート</p>
+        <p class="hint-portrait">縦画面での プレイがおすすめです</p>
+      </div>
+    </section>
+
+    <!-- 遊び方 -->
+    <section id="scr-howto" class="screen" hidden>
+      <div class="panel wide">
+        <h2>遊び方</h2>
+        <p>流れてくる出土品を、<b>はにわは左</b>、<b>土偶は右</b>に仕分けます。</p>
+        <table class="howto-keys">
+          <tr><th></th><th>はにわ（左）</th><th>土偶（右）</th><th>一時停止</th></tr>
+          <tr><td>PC</td><td>A / ←</td><td>D / →</td><td>Space / Esc</td></tr>
+          <tr><td>スマホ</td><td>左のボタン</td><td>右のボタン</td><td>右上の ⏸</td></tr>
+        </table>
+        <ul class="howto-rules">
+          <li>出土品が光る枠に触れたあたりから仕分けられます。</li>
+          <li>まちがえる・判定ラインを越えるとミス。<b>ミス3回で終了</b>です。</li>
+          <li>連続で正解するとコンボ。コンボが続くほど得点が増えます（10コンボ ×1.2 ／ 20 ×1.5 ／ 40 ×2.0 ／ 70 ×2.5 ／ 100 ×3.0）。</li>
+          <li>進むほど出土品が多く、速くなります。</li>
+        </ul>
+        <h3>はにわ（古墳時代）</h3>
+        <div class="gallery" id="gallery-haniwa"></div>
+        <h3>土偶（縄文時代）</h3>
+        <div class="gallery" id="gallery-dogu"></div>
+        <p class="note">はにわの見分け方：円筒の台や、くりぬいた丸い穴（目・口）。土偶の見分け方：線や縄目の文様、ふくらんだ体。色や大きさでは見分けられません。</p>
+        <button class="btn primary" data-act="back">もどる</button>
+      </div>
+    </section>
+
+    <!-- 一時停止 -->
+    <section id="scr-pause" class="screen" hidden>
+      <div class="panel">
+        <h2>一時停止</h2>
+        <button class="btn primary" data-act="resume">再開</button>
+        <button class="btn" data-act="retry">リトライ</button>
+        <button class="btn" data-act="howto">遊び方</button>
+        <button class="btn" data-act="title">タイトルへ</button>
+        <button class="btn small" data-act="mute"><span class="mute-label">音：オン</span></button>
+        <p class="hint-keys only-desktop">Space / Esc で再開</p>
+        <p class="hint-portrait">縦画面での プレイがおすすめです</p>
+      </div>
+    </section>
+
+    <!-- 終了演出 -->
+    <section id="scr-ending" class="screen ending" hidden>
+      <p class="ending-text">終了</p>
+    </section>
+
+    <!-- リザルト -->
+    <section id="scr-result" class="screen" hidden>
+      <div class="panel">
+        <h2>結果</h2>
+        <p class="result-score"><span id="r-score">0</span><span id="r-new" class="new" hidden>NEW!</span></p>
+        <dl class="result-list">
+          <dt>正解数</dt><dd id="r-correct"></dd>
+          <dt>仕分け数</dt><dd id="r-sorted"></dd>
+          <dt>ミス数</dt><dd id="r-miss"></dd>
+          <dt>最大コンボ</dt><dd id="r-combo"></dd>
+          <dt>正答率</dt><dd id="r-acc"></dd>
+          <dt>プレイ時間</dt><dd id="r-time"></dd>
+          <dt>ベストスコア</dt><dd id="r-best"></dd>
+        </dl>
+        <button class="btn primary" data-act="retry" id="btn-retry">リトライ</button>
+        <button class="btn" data-act="title">タイトルへ</button>
+        <p class="hint-keys only-desktop">Enter / R でリトライ</p>
+      </div>
+    </section>
+
+    <div id="debug" class="debug" hidden></div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
