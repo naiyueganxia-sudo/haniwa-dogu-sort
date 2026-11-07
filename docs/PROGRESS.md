@@ -4,15 +4,16 @@
 
 ## 現在の段階
 
-**第3段階：実装 — M1〜M6 完了（2026-11-08）。インターネット公開（GitHub Pages）のユーザー承認待ち。**
-その後、第4段階（実機での動作確認・バランス調整）に進む。
+**第3段階：実装 完了・公開済み（2026-11-08）。次は第4段階（実機での動作確認・バランス調整）。**
+
+公開URL：https://naiyueganxia-sudo.github.io/haniwa-dogu-sort/ （リポジトリ：https://github.com/naiyueganxia-sudo/haniwa-dogu-sort 、公開）
 
 | 段階 | 状態 | 成果物 |
 |---|---|---|
 | 第1段階 要件定義 | 承認済み（2026-11-08） | [01_requirements.md](01_requirements.md) v1.0 |
 | 第2段階 詳細設計 | 承認済み（2026-11-08） | [02_design.md](02_design.md) v1.0 |
-| 第3段階 実装 | M1〜M6 完了。公開は承認待ち | `src/`、`tests/`、`.github/workflows/deploy.yml` |
-| 第4段階 動作確認・調整 | 未着手 | — |
+| 第3段階 実装 | 完了・GitHub Pagesで公開済み | `src/`、`tests/`、`.github/workflows/deploy.yml` |
+| 第4段階 動作確認・調整 | 次に着手（ユーザーの実機確認待ち） | — |
 
 ## 実装の確認結果（2026-11-08）
 
@@ -34,19 +35,20 @@
 | 2026-11-08 | 詳細設計書 v0.1 提示 → 「承認して実装へ」→ v1.0 |
 | 2026-11-08 | M1（core＋テスト）コミット `659ccfb` |
 | 2026-11-08 | M2〜M6（描画・入力・画面・絵・音・デプロイ設定）コミット `0fcf005` |
-| 2026-11-08 | ユーザーから「他の人もURLにアクセスすれば遊べる形にしたい」との要望。GitHub Pagesでの公開を提案中 |
+| 2026-11-08 | ユーザーから「他の人もURLにアクセスすれば遊べる形にしたい」との要望 → 「公開する」で承認。公開リポジトリ作成・push、Pages（GitHub Actions）を有効化。デプロイ成功し、公開URLでタイトル→プレイ開始・コンソールエラーなしを確認 |
 
 ## 次の作業
 
-1. ユーザーが公開を承認したら：GitHubに公開リポジトリを作成（アカウント `naiyueganxia-sudo`、名前は承認されたもの）→ push → Pages の公開元を「GitHub Actions」に設定 → ワークフロー完了を確認 → URLを伝える。
-2. 第4段階：ユーザーに実機（スマホ・PC）で遊んでもらい、難易度の数値（設計書 第4章）、見た目の見分けやすさ、操作感を調整する。
+1. 第4段階：ユーザーに実機（iPhone Safari・Android Chrome・PCのEdge等）で遊んでもらい、未確認項目（音、ダブルタップ拡大の抑止、日本語入力オン時のキー操作）と、難易度の数値（設計書 第4章）・見た目の見分けやすさ・操作感の感想を受け取る。
+2. 調整した数値は DECISIONS.md に記録し、main に push すると自動で公開URLに反映される（.github/workflows/deploy.yml：テスト→ビルド→Pages）。
+3. 軽微：GitHub Actions が Node.js 20 の action（configure-pages@v5、deploy-pages@v4、upload-pages-artifact 内部）に非推奨の警告を出している。動作に問題はない。新しい版が出たら上げる。
 
 ## 保留中の質問
 
-- GitHub Pages での公開の可否とリポジトリ名（提案：`haniwa-dogu-sort`）。公開リポジトリになるためソースコードも公開される。
+なし。
 
 ## 開発環境メモ
 
 - 開発サーバー：`npm run dev`（このセッションでは `.claude/launch.json` の `game`。5173が使用中だと別ポート）
 - デバッグ：URLに `?debug=1`（境界線と内部値の表示、`window.__game()` で状態参照）、`?seed=数値`
-- git：ローカルのみ、ブランチ `main`、リポジトリ内の user.name=y5268
+- git：ブランチ `main`、リモート origin = GitHub（公開）。リポジトリ内の user.name=y5268。**main に push すると自動で本番公開される**

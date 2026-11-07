@@ -2,6 +2,9 @@
 
 PC＋スマートフォン向けブラウザゲーム。ベルトコンベアで流れてくる「はにわ」と「土偶」を左右に仕分ける。
 
+- 公開URL：https://naiyueganxia-sudo.github.io/haniwa-dogu-sort/
+- **main に push すると GitHub Actions で自動的に本番公開される**（テストが失敗すると公開されない）
+
 ## 作業開始時に読むもの
 
 1. [docs/PROGRESS.md](docs/PROGRESS.md) — 現在の段階、次の作業、保留中の質問
