@@ -3,6 +3,12 @@
  * ロジックは論理座標（判定ライン = 1000）で動き、描画時だけ画面に合わせて拡大縮小する。
  */
 
+/**
+ * ルールの版（詳細設計 16.11）。DEFAULT_CONFIG の値やゲーム本体の計算を変えたら1つ上げ、
+ * ランキングのサーバーも同時に更新する（同じ操作でも結果が変わり、古い記録を再計算できなくなるため）。
+ */
+export const RULE_VERSION = 1;
+
 export type Point = readonly [x: number, y: number];
 
 export interface GameConfig {

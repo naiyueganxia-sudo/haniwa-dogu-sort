@@ -1,0 +1,19 @@
+// ランキングのサーバー（Cloudflare Workers ＋ D1）の設定。詳細設計 16.12
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "haniwa-dogu-ranking",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "vars": {
+    "ALLOWED_ORIGINS": "https://naiyueganxia-sudo.github.io"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "haniwa-dogu-ranking",
+      "database_id": "bc6b0506-fc90-4f2f-87cc-fa956a36a24e"
+    }
+  ],
+  "observability": { "enabled": true }
+}

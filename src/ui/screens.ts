@@ -2,7 +2,7 @@ import type { Stats } from '../core/types';
 import { ARTIFACTS } from '../data/artifacts';
 import { drawArtifact } from '../render/art';
 
-export type ScreenName = 'title' | 'howto' | 'pause' | 'ending' | 'result';
+export type ScreenName = 'title' | 'howto' | 'pause' | 'ending' | 'result' | 'ranking';
 
 const IDS: Record<ScreenName, string> = {
   title: 'scr-title',
@@ -10,9 +10,10 @@ const IDS: Record<ScreenName, string> = {
   pause: 'scr-pause',
   ending: 'scr-ending',
   result: 'scr-result',
+  ranking: 'scr-ranking',
 };
 
-/** DOMの画面（タイトル・遊び方・一時停止・終了・リザルト） */
+/** DOMの画面（タイトル・遊び方・一時停止・終了・リザルト・ランキング） */
 export class Screens {
   constructor(onAction: (act: string) => void) {
     document.querySelectorAll<HTMLButtonElement>('[data-act]').forEach((b) => {

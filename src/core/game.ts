@@ -11,6 +11,8 @@ import { zoneOf } from './zones';
  * ゲーム本体（詳細設計 第2・3章）。DOM・Canvasに依存しない。
  * 時刻（秒）を受け取り、出来事（出現・判定ライン通過）の時刻を正確に計算して進める。
  * 同じ種・同じ入力なら、どんな刻みで進めても同じ結果になる。
+ * 位置は「直前の出来事の時刻と位置（基準）」からの経過で毎回計算するため、
+ * 途中を何回に分けて進めても、小数の丸めまで含めて完全に一致する（詳細設計 16.2）。
  */
 export class Game {
   readonly cfg: GameConfig;
@@ -35,7 +37,12 @@ export class Game {
   misses = 0;
   status: 'playing' | 'over' = 'playing';
   overTime = 0;
+  /** 判定された入力（正解・不正解）の記録。サーバーでの再計算に使う（詳細設計 16.3） */
+  readonly pressLog: { t: number; side: Side }[] = [];
   private nextId = 1;
+  /** 基準（直前の出来事）の時刻と累計移動距離 */
+  private segT = 0;
+  private segD = 0;
 
   constructor(seed: number, cfg: GameConfig = DEFAULT_CONFIG) {
     this.cfg = cfg;
@@ -64,9 +71,11 @@ export class Game {
   /** 時刻 t まで進める（t が現在より前なら何もしない） */
   advanceTo(t: number): void {
     while (this.status === 'playing' && t > this.time) {
-      const tSpawn = this.time + Math.max(0, this.nextSpawnD - this.D) / this.speed;
+      const tSpawn = this.segT + Math.max(0, this.nextSpawnD - this.segD) / this.speed;
       const f = this.items[0];
-      const tPass = f ? this.time + Math.max(0, this.cfg.judgeY - this.yOf(f)) / this.speed : Infinity;
+      const tPass = f
+        ? this.segT + Math.max(0, this.cfg.judgeY - (this.cfg.spawnY + this.segD - f.spawnD)) / this.speed
+        : Infinity;
       const tNext = Math.min(tSpawn, tPass);
       if (tNext > t) {
         this.moveTo(t);
@@ -79,8 +88,14 @@ export class Game {
   }
 
   private moveTo(t: number): void {
-    this.D += (t - this.time) * this.speed;
+    this.D = this.segD + (t - this.segT) * this.speed;
     this.time = t;
+  }
+
+  /** 出来事が起きたら、その時刻と位置を新しい基準にする */
+  private anchor(): void {
+    this.segT = this.time;
+    this.segD = this.D;
   }
 
   private spawn(): void {
@@ -100,12 +115,14 @@ export class Game {
     this.spawnedCount++;
     this.speed = speedFor(n, cfg, this.d.baseSpeed);
     this.nextSpawnD = item.spawnD + spacingFor(n, cfg, this.d.baseSpeed);
+    this.anchor();
     this.events.push({ type: 'spawn', t: this.time, item });
   }
 
   private passFront(): void {
     const item = this.items.shift()!;
     this.D = Math.max(this.D, item.spawnD + this.cfg.judgeY - this.cfg.spawnY);
+    this.anchor();
     this.passed++;
     this.combo = 0;
     this.events.push({ type: 'passed', t: this.time, item });
@@ -132,6 +149,8 @@ export class Game {
     if (zone === 'waiting') return 'ignored-waiting';
     // zone が 'passed' になることはない（advanceTo で処理済み）
     this.items.shift();
+    // 判定に使った時刻（入力の時刻が直前のフレームより前なら、今の時刻）を記録
+    this.pressLog.push({ t: this.time, side });
     if (SIDE_OF[item.category] === side) {
       this.combo++;
       if (this.combo > this.maxCombo) this.maxCombo = this.combo;

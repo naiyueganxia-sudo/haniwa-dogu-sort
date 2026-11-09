@@ -8,11 +8,15 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "server:dev": "wrangler dev --config server/wrangler.jsonc --port 8788 --ip 127.0.0.1",
+    "server:db:local": "wrangler d1 execute haniwa-dogu-ranking --local --config server/wrangler.jsonc --file server/schema.sql",
+    "server:deploy": "wrangler deploy --config server/wrangler.jsonc"
   },
   "devDependencies": {
     "typescript": "^7.0.2",
     "vite": "^8.3.6",
-    "vitest": "^4.1.12"
+    "vitest": "^4.1.12",
+    "wrangler": "^4.153.0"
   }
 }

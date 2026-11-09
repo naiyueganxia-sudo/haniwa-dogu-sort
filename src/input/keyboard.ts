@@ -12,9 +12,16 @@ const SORT_KEYS: Record<string, Side> = { KeyA: 'L', ArrowLeft: 'L', KeyD: 'R', 
 const COMMAND_KEYS = new Set(['Space', 'Escape', 'Enter', 'NumpadEnter', 'KeyR']);
 const BLOCK_DEFAULT = new Set(['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']);
 
+function isTyping(t: EventTarget | null): boolean {
+  if (!(t instanceof HTMLElement)) return false;
+  return t.isContentEditable || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT';
+}
+
 export function bindKeyboard(h: KeyHandlers): void {
   window.addEventListener('keydown', (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
+    // 名前欄などで文字を入力しているときは、ゲームの操作として扱わない（詳細設計 16.9）
+    if (isTyping(e.target)) return;
     const side = SORT_KEYS[e.code];
     if (BLOCK_DEFAULT.has(e.code) || side || COMMAND_KEYS.has(e.code)) e.preventDefault();
     if (e.repeat) return; // 長押しのリピートは常に無視
@@ -26,6 +33,6 @@ export function bindKeyboard(h: KeyHandlers): void {
   });
   window.addEventListener('keyup', (e) => {
     if (SORT_KEYS[e.code]) h.sortUp(`key:${e.code}`);
-    if (BLOCK_DEFAULT.has(e.code)) e.preventDefault();
+    if (BLOCK_DEFAULT.has(e.code) && !isTyping(e.target)) e.preventDefault();
   });
 }

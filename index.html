@@ -46,8 +46,9 @@
         <div class="title-art"><canvas id="title-h" width="96" height="96"></canvas><span>？</span><canvas id="title-d" width="96" height="96"></canvas></div>
         <button class="btn primary" data-act="start">スタート</button>
         <button class="btn" data-act="howto">遊び方</button>
+        <button class="btn needs-ranking" data-act="ranking">ランキング</button>
         <button class="btn small" data-act="mute"><span class="mute-label">音：オン</span></button>
-        <p class="best">ベストスコア <span class="best-score">0</span></p>
+        <p class="best">自己ベスト <span class="best-score">0</span></p>
         <p class="hint-keys only-desktop">Enter / Space でスタート</p>
         <p class="hint-portrait">縦画面での プレイがおすすめです</p>
       </div>
@@ -109,11 +110,43 @@
           <dt>最大コンボ</dt><dd id="r-combo"></dd>
           <dt>正答率</dt><dd id="r-acc"></dd>
           <dt>プレイ時間</dt><dd id="r-time"></dd>
-          <dt>ベストスコア</dt><dd id="r-best"></dd>
+          <dt>自己ベスト</dt><dd id="r-best"></dd>
         </dl>
+        <div id="reg" class="reg" hidden>
+          <p id="reg-msg" class="reg-msg"></p>
+          <div id="reg-form" class="reg-form" hidden>
+            <input id="reg-name" class="reg-name" type="text" maxlength="40" autocomplete="nickname" enterkeyhint="done" spellcheck="false" placeholder="名前（10文字まで）" aria-label="ランキングに載せる名前" />
+            <p class="reg-note">名前は誰でも見られます。本名は入れないでください</p>
+            <p id="reg-err" class="reg-err" aria-live="polite"></p>
+            <div class="reg-btns">
+              <button type="button" id="reg-submit" class="btn primary">ランキングに登録</button>
+              <button type="button" id="reg-skip" class="btn">登録しない</button>
+            </div>
+          </div>
+          <div class="reg-btns">
+            <button type="button" id="reg-retry" class="btn small" hidden>もう一度</button>
+            <button type="button" id="reg-view" class="btn small" hidden>ランキングを見る</button>
+          </div>
+        </div>
         <button class="btn primary" data-act="retry" id="btn-retry">リトライ</button>
         <button class="btn" data-act="title">タイトルへ</button>
         <p class="hint-keys only-desktop">Enter / R でリトライ</p>
+      </div>
+    </section>
+
+    <!-- ランキング -->
+    <section id="scr-ranking" class="screen" hidden>
+      <div class="panel rank-panel">
+        <h2>ランキング</h2>
+        <p class="rank-best">あなたの自己ベスト <b class="best-score">0</b> 点<span class="rank-best-note">（この端末）</span></p>
+        <div id="rank-wrap" class="rank-wrap">
+          <div class="rank-head" aria-hidden="true"><span>順位</span><span>名前</span><span>スコア</span><span>登録日</span></div>
+          <p id="rank-msg" class="rank-msg">読み込み中…</p>
+          <ol id="rank-list" class="rank-list"></ol>
+        </div>
+        <button type="button" id="rank-reload" class="btn small" hidden>もう一度</button>
+        <button class="btn primary" data-act="rank-back">もどる</button>
+        <p class="hint-keys only-desktop">Esc でもどる</p>
       </div>
     </section>
 

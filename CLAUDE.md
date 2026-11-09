@@ -4,6 +4,8 @@ PC＋スマートフォン向けブラウザゲーム。ベルトコンベアで
 
 - 公開URL：https://naiyueganxia-sudo.github.io/haniwa-dogu-sort/
 - **main に push すると GitHub Actions で自動的に本番公開される**（テストが失敗すると公開されない）
+- **公開中のゲームには遊んでいる人がいる。main への push やランキングサーバーの本番公開（リリース）は、ユーザーに時期を確認してから行う**（ユーザー指示 2026-11-09）
+- ランキング：Cloudflare Workers ＋ D1（`server/`）。ゲーム本体の計算（`src/core`）をサーバーでも使うため、core や `config.ts` の数値を変えたら `RULE_VERSION` を上げてサーバーも更新する（設計書 16.11）
 
 ## 作業開始時に読むもの
 

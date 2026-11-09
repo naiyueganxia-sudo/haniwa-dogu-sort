@@ -3,19 +3,22 @@ import { DEFAULT_CONFIG, type GameConfig } from '../core/config';
 import { interpolate } from '../core/difficulty';
 import { Game } from '../core/game';
 import { InputArbiter } from '../core/inputArbiter';
+import { encodeLog, quantize } from '../core/replay';
 import { randomSeed } from '../core/rng';
 import type { GameEvent, Side } from '../core/types';
 import { bindKeyboard } from '../input/keyboard';
 import { bindTouch, releaseAllButtons } from '../input/touch';
+import { RankingClient } from '../net/ranking';
 import { Effects } from '../render/effects';
 import { Renderer } from '../render/renderer';
 import { Hud } from '../ui/hud';
+import { RankingUi } from '../ui/rankingUi';
 import { Screens } from '../ui/screens';
 import { GameClock } from './clock';
 import { computeLayout, decideMode, type Layout, type Mode } from './layout';
 import { load, save, type SaveData } from './storage';
 
-type Scene = 'title' | 'howto' | 'playing' | 'paused' | 'ending' | 'result';
+type Scene = 'title' | 'howto' | 'playing' | 'paused' | 'ending' | 'result' | 'ranking';
 
 const COLOR_GOOD = '#f4d27a';
 const COLOR_BAD = '#ff6b62';
@@ -34,6 +37,11 @@ export class App {
   private data: SaveData = load();
   private scene: Scene = 'title';
   private howtoReturn: Scene = 'title';
+  private rankingReturn: Scene = 'title';
+  private ranking = new RankingClient();
+  private rankingUi: RankingUi;
+  /** 今のゲームの整理券（なければランキングに登録できない） */
+  private runToken: string | null = null;
   private mode: Mode = 'desktop';
   private touchSeen = false;
   private layout!: Layout;
@@ -57,12 +65,24 @@ export class App {
     this.debugEl.hidden = !this.debug;
     if (this.debug) (window as unknown as { __game: () => Game | null; __scene: () => Scene }).__game = () => this.game;
     if (this.debug) (window as unknown as { __scene: () => Scene }).__scene = () => this.scene;
+    // 開発用：画面が隠れていて描画ループが止まっているときに、1フレームぶん手で進める
+    if (this.debug) (window as unknown as { __step: () => void }).__step = () => this.step();
 
     this.renderer = new Renderer(document.getElementById('game') as HTMLCanvasElement);
     this.screens = new Screens((act) => this.action(act));
     this.sfx.muted = this.data.muted;
     this.screens.setMuted(this.data.muted);
     this.screens.setBest(this.data.bestScore);
+    this.rankingUi = new RankingUi(this.ranking, {
+      getBest: () => this.data.bestScore,
+      getLastName: () => this.data.lastName,
+      setLastName: (name) => {
+        this.data.lastName = name;
+        save(this.data);
+      },
+      openRanking: () => this.action('ranking'),
+    });
+    this.ranking.prefetchRun();
 
     bindKeyboard({
       sortDown: (s, side, ms) => this.sortDown(s, side, ms),
@@ -116,7 +136,7 @@ export class App {
   // ===== 入力 =====
   private sortDown(source: string, side: Side, ms: number): void {
     if (this.scene !== 'playing' || !this.game) return;
-    const t = this.clock.timeAt(ms);
+    const t = quantize(this.clock.timeAt(ms));
     if (!this.arbiter.down(source, side, t)) return;
     this.game.press(side, t);
     this.handleEvents(this.game.drainEvents());
@@ -132,6 +152,7 @@ export class App {
       if (s === 'playing') this.pause();
       else if (s === 'paused') this.resume();
       else if (s === 'howto') this.action('back');
+      else if (s === 'ranking') this.action('rank-back');
     } else if (code === 'Enter') {
       if (s === 'title') this.start();
       else if (s === 'result') this.tryRetry();
@@ -165,6 +186,18 @@ export class App {
         this.scene = this.howtoReturn;
         this.screens.show(this.howtoReturn === 'paused' ? 'pause' : 'title');
         break;
+      case 'ranking':
+        if (this.scene !== 'title' && this.scene !== 'result') break;
+        this.rankingReturn = this.scene;
+        this.scene = 'ranking';
+        this.screens.show('ranking');
+        this.rankingUi.openScreen();
+        break;
+      case 'rank-back':
+        if (this.scene !== 'ranking') break;
+        this.scene = this.rankingReturn;
+        this.screens.show(this.rankingReturn === 'result' ? 'result' : 'title');
+        break;
       case 'mute':
         this.data.muted = !this.data.muted;
         this.sfx.muted = this.data.muted;
@@ -178,7 +211,11 @@ export class App {
   private start(): void {
     this.sfx.unlock();
     clearTimeout(this.endingTimer);
-    this.game = new Game(this.seedParam ?? randomSeed(), this.cfg);
+    this.rankingUi.leaveResult();
+    // ランキング用の整理券があればその種で遊ぶ。なければ登録できないプレイになる（16.4）
+    const run = this.seedParam === null ? this.ranking.takeRun() : null;
+    this.runToken = run?.token ?? null;
+    this.game = new Game(this.seedParam ?? run?.seed ?? randomSeed(), this.cfg);
     this.clock.start(performance.now());
     this.arbiter.reset();
     this.fx.clear();
@@ -200,6 +237,8 @@ export class App {
     releaseAllButtons();
     this.scene = 'paused';
     this.screens.show('pause');
+    // 一時停止メニューからリトライしたときのために、次のゲーム用の整理券を取っておく（プレイ中ではないので通信してよい）
+    this.ranking.prefetchRun();
   }
 
   private autoPause(): void {
@@ -217,6 +256,8 @@ export class App {
 
   private toTitle(): void {
     clearTimeout(this.endingTimer);
+    this.rankingUi.leaveResult();
+    this.ranking.prefetchRun();
     this.clock.pause();
     this.game = null;
     this.fx.clear();
@@ -251,6 +292,11 @@ export class App {
     this.screens.fillResult(s, this.data.bestScore, isNew);
     this.scene = 'result';
     this.screens.show('result');
+    // ランキング（16.9）。次のゲーム用の整理券もここで取る（プレイ中は通信しない）
+    const log = this.runToken ? encodeLog(this.game.pressLog) : null;
+    void this.rankingUi.startResult({ score: s.score, token: log === null ? null : this.runToken, log });
+    this.runToken = null;
+    this.ranking.prefetchRun();
     this.retryLockUntil = performance.now() + this.cfg.retryLockSec * 1000;
     this.screens.setRetryEnabled(false);
     window.setTimeout(() => this.screens.setRetryEnabled(true), this.cfg.retryLockSec * 1000);
@@ -312,11 +358,16 @@ export class App {
 
   // ===== ループ =====
   private frame(_tMs: number): void {
+    this.step();
+    requestAnimationFrame((t) => this.frame(t));
+  }
+
+  private step(): void {
     const nowMs = performance.now();
     const now = nowMs / 1000;
     const game = this.game;
     if (this.scene === 'playing' && game) {
-      const t = this.clock.tick(nowMs);
+      const t = quantize(this.clock.tick(nowMs));
       game.advanceTo(t);
       this.handleEvents(game.drainEvents());
       this.monitorQuality(nowMs);
@@ -338,7 +389,6 @@ export class App {
     if (game) this.hud.update(game.score, game.combo, game.multiplier, game.misses);
     else this.hud.update(0, 0, 1, 0);
     if (this.debug) this.drawDebug(nowMs);
-    requestAnimationFrame((t) => this.frame(t));
   }
 
   /** 描画負荷の調整（詳細設計 8.3）：直近3秒の平均が20msを超えたら低画質へ */
