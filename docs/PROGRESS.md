@@ -4,9 +4,9 @@
 
 ## 現在の段階
 
-**追加機能「オンラインランキング」：ゲーム側（K1〜K3）は完成。ランキングのサーバーは Cloudflare に公開済み（2026-11-10）。残りはゲーム本体の公開（main への push）だけで、時期はユーザーが決める（ユーザー指示「実際のサーバーは遊んでる人がいるからリリースはタイミング見てね」）。**
+**追加機能「オンラインランキング」：2026-11-10 にリリース済み（コミット `6531ec6`）。公開URLで登録・表示を確認。次は実機での確認と、第4段階（調整）。**
 
-未コミット・未push（公開中のゲームは変わっていない。サーバーはまだどこからも呼ばれていない）。
+本番のランキングは、ユーザーの試用データと Claude の確認用データを消した0件の状態から開始。
 ランキングのサーバー：https://haniwa-dogu-ranking.haniwa-dogu-sort.workers.dev （ユーザーの Cloudflare アカウント、Worker 名 haniwa-dogu-ranking、D1 データベース haniwa-dogu-ranking〔APAC〕）
 
 公開URL：https://naiyueganxia-sudo.github.io/haniwa-dogu-sort/ （リポジトリ：https://github.com/naiyueganxia-sudo/haniwa-dogu-sort 、公開）
@@ -19,7 +19,7 @@
 | 第4段階 動作確認・調整 | ユーザーの実機確認待ち | — |
 | 追加：ランキング 要件定義 | 承認済み（2026-11-09、推奨案で承認） | [01_requirements.md](01_requirements.md) 第8章 |
 | 追加：ランキング 詳細設計 | 承認済み（2026-11-09、承認して実装へ） | [02_design.md](02_design.md) 第16章 |
-| 追加：ランキング 実装 | K1〜K3 完了。K4 のうちサーバー公開は完了、ゲーム本体の push はユーザーの合図待ち | `src/core/replay.ts`・`name.ts`・`rankingTypes.ts`、`src/net/ranking.ts`、`src/ui/rankingUi.ts`、`server/` |
+| 追加：ランキング 実装・公開 | 完了・リリース済み（2026-11-10） | `src/core/replay.ts`・`name.ts`・`rankingTypes.ts`、`src/net/ranking.ts`、`src/ui/rankingUi.ts`、`server/` |
 
 ## ランキングの実装の確認結果（2026-11-10、ローカル）
 
@@ -37,7 +37,8 @@
   - ローカルのサーバーのポートを 8788 に変更（8787 はこのPCで別のプログラムが使っていた）。
   - 開発用（`?debug=1` のときだけ）に `window.__step()`（1フレーム手で進める）を追加。画面が隠れて描画ループが止まっていても確認できるようにするため。
 - 本番サーバーでの確認（2026-11-10）：このPCのゲームを本番サーバーにつなぎ（`.claude/launch.json` の `game-prodapi`＝`vite --mode production`、localhost:5175）、整理券の取得 → プレイ → 「動作テスト」で登録 → 「1位 に登録しました！」→ ランキングに強調表示、まで成功。公開URL以外からの登録は拒否（error: origin）。確認後、「動作テスト」の記録は本番のデータベースから削除済み（本番のランキングは0件）。
-- **未確認**：公開URL（GitHub Pages）からの動作（push 後に確認）、実機（iPhone・Android）での文字入力（キーボードが出たときの画面、日本語入力の Enter）。
+- 公開URLでの確認（2026-11-10、リリース後）：タイトルに「ランキング」ボタン、整理券の取得、プレイ → 「動作テスト」で登録 → 「1位 に登録しました！」。確認後に「動作テスト」を削除し、本番のランキングは0件。
+- **未確認**：実機（iPhone・Android）での文字入力（キーボードが出たときの画面、日本語入力の Enter）。
 
 ## 実装の確認結果（2026-11-08）
 
@@ -66,13 +67,13 @@
 | 2026-11-09 | ユーザーから「実際のサーバーは遊んでる人がいるからリリースはタイミング見てね」。公開はユーザーの合図を待つことに |
 | 2026-11-10 | ランキング K1〜K3 をローカルで実装・確認（未コミット） |
 | 2026-11-10 | ユーザーが Cloudflare アカウントを作成し、wrangler のログインを許可。D1 作成・表の作成・秘密の鍵の登録・サーバー公開。本番サーバーで登録まで確認し、テストの記録は削除 |
+| 2026-11-10 | ユーザーが本番サーバーにつないだ試し用のゲーム（localhost:5175）で試用 → 「お願いします」。本番のデータ（試用の1件と連続投稿判定の一時データ）を削除し、コミット `6531ec6` を main に push してリリース。GitHub Actions 成功（デプロイに約5分）。公開URLで登録を確認し、確認用の記録を削除。ユーザーはリリース後にSNSへポストする予定 |
 
 ## 次の作業
 
-1. ランキングの公開（K4 の残り）。**ユーザーが時期を決めたら**：コミット → main に push（自動でテスト→ビルド→公開）→ 公開URLで ランキングボタン表示・登録・表示を確認 → テストの記録を消す。
-   - サーバー側は公開済み。`.env.production`（サーバーのURL）も作成済み。push するとゲームにランキングが出る。
-   - 公開の瞬間に遊んでいた人は、今の版のまま遊び続けられる（ページを開き直すと新しい版になる）。古い版にはランキングがないだけで、困ることはない。
-   - サーバーを更新するとき：`npm run server:deploy`（Claude がこのPCから。wrangler のログインは済み）。
+1. ランキング：実機（iPhone Safari・Android Chrome）で名前の入力と登録を試してもらう。不適切な名前の削除依頼があれば `npx wrangler d1 execute haniwa-dogu-ranking --remote --config server/wrangler.jsonc --command "DELETE FROM scores WHERE id = …"`（先に SELECT で確認する。D-27）。
+   - サーバーを更新するとき：`npm run server:deploy`（Claude がこのPCから。wrangler のログインは済み）。core や config の数値を変えたら `RULE_VERSION` を上げ、サーバーとゲームを同時に更新し、ランキングを残すか消すかをユーザーに確認する（設計書 16.11、R7）。
+   - 本番サーバーにつないで試すとき：`.claude/launch.json` の `game-prodapi`（localhost:5175）。登録した記録は本番に入るので、試した後は消す。
 1. 第4段階：ユーザーに実機（iPhone Safari・Android Chrome・PCのEdge等）で遊んでもらい、未確認項目（音、ダブルタップ拡大の抑止、日本語入力オン時のキー操作）と、難易度の数値（設計書 第4章）・見た目の見分けやすさ・操作感の感想を受け取る。
 2. 調整した数値は DECISIONS.md に記録し、main に push すると自動で公開URLに反映される（.github/workflows/deploy.yml：テスト→ビルド→Pages）。
 3. 軽微：GitHub Actions が Node.js 20 の action（configure-pages@v5、deploy-pages@v4、upload-pages-artifact 内部）に非推奨の警告を出している。動作に問題はない。新しい版が出たら上げる。
