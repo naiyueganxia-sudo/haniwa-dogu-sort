@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { ARTIFACTS } from '../src/data/artifacts';
+import { ARTIFACTS, firstDifficultyOf } from '../src/data/artifacts';
 import { ART } from '../src/render/art';
 import { CLAY_PALETTE } from '../src/render/art/common';
-import { DEFAULT_CONFIG as C } from '../src/core/config';
+import { DEFAULT_CONFIG as C, DIFFICULTIES } from '../src/core/config';
 
 describe('出土品のデータ（C-31, C-41）', () => {
   it('すべての種類に絵がある（絵だけ余ってもいない）', () => {
@@ -14,9 +14,23 @@ describe('出土品のデータ（C-31, C-41）', () => {
     for (const a of ARTIFACTS) expect(a.id.startsWith(a.category === 'haniwa' ? 'h_' : 'd_'), a.id).toBe(true);
   });
 
-  it('各分類に8種類', () => {
-    expect(ARTIFACTS.filter((a) => a.category === 'haniwa').length).toBe(8);
-    expect(ARTIFACTS.filter((a) => a.category === 'dogu').length).toBe(8);
+  it('各分類に16種類（激むずの上限と同じ。詳細設計 17.1）', () => {
+    expect(ARTIFACTS.filter((a) => a.category === 'haniwa').length).toBe(16);
+    expect(ARTIFACTS.filter((a) => a.category === 'dogu').length).toBe(16);
+    expect(DIFFICULTIES.extreme.maxVariants).toBe(16);
+  });
+
+  it('id の重複がない', () => {
+    expect(new Set(ARTIFACTS.map((a) => a.id)).size).toBe(ARTIFACTS.length);
+  });
+
+  it('最初に出てくる難易度（遊び方の札）', () => {
+    expect(firstDifficultyOf('h_cylinder')).toBe('easy');
+    expect(firstDifficultyOf('h_chicken')).toBe('normal');
+    expect(firstDifficultyOf('h_boat')).toBe('normal');
+    expect(firstDifficultyOf('h_rikishi')).toBe('hard');
+    expect(firstDifficultyOf('h_asagao')).toBe('extreme');
+    expect(firstDifficultyOf('d_tsutsu')).toBe('extreme');
   });
 
   it('色のパレットの数と設定が一致（両分類共通）', () => {

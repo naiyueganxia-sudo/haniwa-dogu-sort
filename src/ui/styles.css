@@ -645,9 +645,15 @@ body.mode-landscape .milestone {
   color: var(--ink-dim);
 }
 .rank-name {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.rank-name-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
 }
 .rank-score {
   text-align: right;
@@ -665,4 +671,116 @@ body.mode-landscape .milestone {
 .rank-row.mine {
   background: rgba(232, 184, 90, 0.22);
   box-shadow: inset 3px 0 0 var(--gold);
+}
+
+/* ===== 難易度（詳細設計 17.6。色だけでなく文字でも示す） ===== */
+.diff-tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 999px;
+  color: #1d1611;
+  background: #c9b089;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.diff-tag:empty {
+  display: none;
+}
+.diff-tag[data-diff='easy'] { background: #8fcf7e; }
+.diff-tag[data-diff='normal'] { background: #d9b38c; }
+.diff-tag[data-diff='hard'] { background: #f0a050; }
+.diff-tag[data-diff='extreme'] { background: #ff6b62; color: #fff; }
+.hud-diff {
+  margin-right: 6px;
+  align-self: center;
+}
+.panel h2 .diff-tag {
+  font-size: 13px;
+  margin-left: 6px;
+}
+.diff-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.diff-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: left;
+}
+.diff-btn .diff-name {
+  font-size: 18px;
+}
+.diff-btn .diff-info {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-dim);
+  text-align: right;
+  line-height: 1.4;
+}
+.diff-btn.selected {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
+  background: rgba(232, 184, 90, 0.16);
+}
+.diff-btn[data-diff='extreme'] .diff-name {
+  color: #ff8a80;
+}
+.rank-bests {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+.rank-bests div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.rank-name .diff-tag {
+  margin-left: 5px;
+  font-size: 10px;
+  padding: 2px 5px;
+}
+.gallery figure .diff-tag {
+  margin-top: 2px;
+  font-size: 10px;
+  padding: 2px 5px;
+}
+
+/* ランキングの絞り込み（詳細設計 17.11） */
+.rank-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.rank-tab {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ink);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.rank-tab.on {
+  background: var(--gold);
+  border-color: transparent;
+  color: #2a1a08;
+}
+.rank-tab.on[data-diff='extreme'] {
+  background: #ff6b62;
+  color: #fff;
 }

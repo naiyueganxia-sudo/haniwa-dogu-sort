@@ -37,7 +37,7 @@ async function playRun(rngSeed: number, opt: { stopAfterSec?: number; name?: str
   clock += Math.round(g.overTime * 1000) + 5000;
   return {
     game: g,
-    body: { token: run.token, name: opt.name ?? 'はにわ', log: encodeLog(g.pressLog)!, score: g.score, ruleVersion: RULE_VERSION },
+    body: { token: run.token, name: opt.name ?? 'はにわ', log: encodeLog(g.pressLog)!, score: g.score, difficulty: 'normal', ruleVersion: RULE_VERSION },
   };
 }
 
@@ -71,7 +71,7 @@ describe('登録（詳細設計 16.5）', () => {
     const r = await post(body);
     expect(r.status).toBe(200);
     expect(r.body.rank).toBe(1);
-    expect(r.body.entries).toEqual([{ id: r.body.id, rank: 1, name: 'はにわ', score: game.score, at: clock }]);
+    expect(r.body.entries).toEqual([{ id: r.body.id, rank: 1, name: 'はにわ', score: game.score, at: clock, difficulty: 'normal' }]);
     expect(store.rows[0]).toMatchObject({ maxCombo: game.maxCombo, playMs: Math.round(game.overTime * 1000), ruleVer: RULE_VERSION });
   });
 
@@ -131,14 +131,14 @@ describe('登録（詳細設計 16.5）', () => {
   it('0点は登録できない', async () => {
     const run = await get<RunResponse>('/api/run');
     clock += 60_000;
-    expect((await post({ token: run.token, name: 'a', log: '', score: 0, ruleVersion: RULE_VERSION })).body.error).toBe('invalid');
+    expect((await post({ token: run.token, name: 'a', log: '', score: 0, difficulty: 'normal', ruleVersion: RULE_VERSION })).body.error).toBe('invalid');
   });
 
   it('7. 発行からの実際の経過時間がプレイ時間より短ければ拒否', async () => {
     const run = await get<RunResponse>('/api/run');
     const g = playLikeApp(run.seed, 9, { stopAfterSec: 60 });
     clock += Math.round(g.overTime * 1000) - LIMITS.wallSlackMs - 1000;
-    const body = { token: run.token, name: 'a', log: encodeLog(g.pressLog)!, score: g.score, ruleVersion: RULE_VERSION };
+    const body = { token: run.token, name: 'a', log: encodeLog(g.pressLog)!, score: g.score, difficulty: 'normal', ruleVersion: RULE_VERSION };
     expect((await post(body)).body.error).toBe('invalid');
     clock += 2000;
     expect((await post(body)).status).toBe(200);
@@ -149,11 +149,73 @@ describe('登録（詳細設計 16.5）', () => {
   });
 });
 
+describe('難易度（詳細設計 17.5）', () => {
+  async function playDiff(rngSeed: number, difficulty: 'easy' | 'normal' | 'hard' | 'extreme') {
+    const run = await get<RunResponse>('/api/run');
+    const g = playLikeApp(run.seed, rngSeed, { errorRate: 0.02, stopAfterSec: 30, difficulty });
+    clock += Math.round(g.overTime * 1000) + 5000;
+    return { g, body: { token: run.token, name: 'どぐう', log: encodeLog(g.pressLog)!, score: g.score, difficulty, ruleVersion: RULE_VERSION } };
+  }
+
+  it('難易度つきで登録でき、ランキングに難易度が付く', async () => {
+    const { g, body } = await playDiff(40, 'extreme');
+    const r = await post(body);
+    expect(r.status).toBe(200);
+    expect(r.body.entries[0]).toMatchObject({ score: g.score, difficulty: 'extreme' });
+    expect(store.rows[0]!.difficulty).toBe('extreme');
+  });
+
+  it('難易度を偽った記録・知らない難易度は拒否', async () => {
+    const { body } = await playDiff(41, 'easy');
+    expect((await post({ ...body, difficulty: 'extreme', score: body.score * 4 })).body.error).toBe('invalid');
+    expect((await post({ ...body, difficulty: 'oni' })).body.error).toBe('invalid');
+    expect((await post({ ...body, difficulty: undefined })).body.error).toBe('invalid');
+    expect((await post(body)).status).toBe(200);
+  });
+
+  it('難易度で絞り込むと、その難易度だけの上位30位（順位もその中で数える。D-38）', async () => {
+    let t = 1;
+    const add = (name: string, score: number, difficulty: 'easy' | 'normal' | 'hard' | 'extreme') =>
+      store.insert({ runId: `f${t}`, name, score, maxCombo: 0, playMs: 0, ruleVer: RULE_VERSION, createdAt: t++, difficulty });
+    await add('a', 900, 'extreme');
+    await add('b', 800, 'easy');
+    await add('c', 700, 'extreme');
+    for (let i = 0; i < 35; i++) await add(`e${i}`, 100 + i, 'easy');
+    const all = await get<RankingResponse>('/api/ranking');
+    const ex = await get<RankingResponse>('/api/ranking?difficulty=extreme');
+    const easy = await get<RankingResponse>('/api/ranking?difficulty=easy');
+    expect(all.entries.length).toBe(30);
+    expect(ex.entries.map((e) => [e.rank, e.name, e.difficulty])).toEqual([
+      [1, 'a', 'extreme'],
+      [2, 'c', 'extreme'],
+    ]);
+    expect(easy.entries.length).toBe(30);
+    expect(easy.entries[0]).toMatchObject({ rank: 1, name: 'b' });
+    expect(easy.entries.every((e) => e.difficulty === 'easy')).toBe(true);
+    // 知らない値は全体
+    expect((await get<RankingResponse>('/api/ranking?difficulty=oni')).entries.length).toBe(30);
+  });
+
+  it('登録の応答に、全体の順位と難易度の中の順位が入る（D-39）', async () => {
+    await store.insert({ runId: 'x1', name: 'top', score: 99999, maxCombo: 0, playMs: 0, ruleVer: RULE_VERSION, createdAt: 0, difficulty: 'normal' });
+    const { body } = await playDiff(43, 'hard');
+    const r = await post(body);
+    expect(r.status).toBe(200);
+    expect(r.body.rank).toBe(2);
+    expect(r.body.diffRank).toBe(1);
+  });
+
+  it('ルールの版1（難易度がない）ページからの送信は「再読み込み」', async () => {
+    const { body } = await playDiff(42, 'normal');
+    expect((await post({ ...body, ruleVersion: 1 })).body.error).toBe('version');
+  });
+});
+
 describe('ランキング（D-22・D-26）', () => {
   it('点数の高い順、同点は先に登録した方が上で同じ順位。上位30件まで', async () => {
     let t = 1;
     const add = (name: string, score: number) =>
-      store.insert({ runId: `r${t}`, name, score, maxCombo: 0, playMs: 0, ruleVer: RULE_VERSION, createdAt: t++ });
+      store.insert({ runId: `r${t}`, name, score, maxCombo: 0, playMs: 0, ruleVer: RULE_VERSION, createdAt: t++, difficulty: 'normal' });
     await add('a', 500);
     await add('b', 900);
     await add('c', 500);
@@ -178,7 +240,7 @@ describe('ランキング（D-22・D-26）', () => {
 
   it('ランキングは10秒キャッシュ。登録した本人には最新の表を返す', async () => {
     expect((await get<RankingResponse>('/api/ranking')).entries.length).toBe(0);
-    await store.insert({ runId: 'zz', name: 'z', score: 1, maxCombo: 0, playMs: 0, ruleVer: 1, createdAt: 0 });
+    await store.insert({ runId: 'zz', name: 'z', score: 1, maxCombo: 0, playMs: 0, ruleVer: 1, createdAt: 0, difficulty: 'normal' });
     expect((await get<RankingResponse>('/api/ranking')).entries.length).toBe(0);
     clock += LIMITS.rankingCacheMs;
     expect((await get<RankingResponse>('/api/ranking')).entries.length).toBe(1);

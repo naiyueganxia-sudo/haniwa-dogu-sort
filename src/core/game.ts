@@ -1,11 +1,23 @@
-import { DEFAULT_CONFIG, derive, type Derived, type GameConfig } from './config';
+import { DEFAULT_CONFIG, DIFFICULTIES, DIFFICULTY_ORDER, derive, type Derived, type Difficulty, type GameConfig } from './config';
 import { spacingFor, speedFor } from './difficulty';
 import { Rng } from './rng';
-import { isMilestone, multiplierFor } from './scoring';
+import { isMilestone, multiplierFor, pointsFor } from './scoring';
 import { Spawner } from './spawner';
 import type { GameEvent, Item, PressResult, Side, Stats, Zone } from './types';
 import { SIDE_OF } from './types';
 import { zoneOf } from './zones';
+
+/**
+ * 乱数の種を難易度で混ぜる（詳細設計 17.4、R13）。
+ * 同じ整理券でも難易度が違えば出土品の並びが変わり、難易度を偽った操作記録は再計算で合わなくなる。
+ */
+export function mixSeed(seed: number, difficulty: Difficulty): number {
+  const k = DIFFICULTY_ORDER.indexOf(difficulty) + 1;
+  let h = (seed ^ Math.imul(k, 0x9e3779b9)) >>> 0;
+  h = Math.imul(h ^ (h >>> 16), 0x85ebca6b) >>> 0;
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35) >>> 0;
+  return (h ^ (h >>> 16)) >>> 0;
+}
 
 /**
  * ゲーム本体（詳細設計 第2・3章）。DOM・Canvasに依存しない。
@@ -44,10 +56,13 @@ export class Game {
   private segT = 0;
   private segD = 0;
 
-  constructor(seed: number, cfg: GameConfig = DEFAULT_CONFIG) {
+  readonly difficulty: Difficulty;
+
+  constructor(seed: number, difficulty: Difficulty = 'normal', cfg: GameConfig = DEFAULT_CONFIG) {
     this.cfg = cfg;
     this.d = derive(cfg);
-    this.spawner = new Spawner(cfg, new Rng(seed));
+    this.difficulty = difficulty;
+    this.spawner = new Spawner(cfg, new Rng(mixSeed(seed, difficulty)), difficulty);
     this.speed = speedFor(0, cfg, this.d.baseSpeed);
   }
 
@@ -105,7 +120,7 @@ export class Game {
     const item: Item = {
       id: this.nextId++,
       category,
-      variantId: this.spawner.nextVariant(category),
+      variantId: this.spawner.nextVariant(category, n),
       look: this.spawner.nextLook(),
       spawnD: this.nextSpawnD,
     };
@@ -117,6 +132,9 @@ export class Game {
     this.nextSpawnD = item.spawnD + spacingFor(n, cfg, this.d.baseSpeed);
     this.anchor();
     this.events.push({ type: 'spawn', t: this.time, item });
+    if (n > 0 && this.spawner.variantCount(n) > this.spawner.variantCount(n - 1)) {
+      this.events.push({ type: 'unlock', t: this.time, count: this.spawner.variantCount(n) });
+    }
   }
 
   private passFront(): void {
@@ -155,7 +173,7 @@ export class Game {
       this.combo++;
       if (this.combo > this.maxCombo) this.maxCombo = this.combo;
       const mult = multiplierFor(this.combo, this.cfg);
-      const points = Math.round(this.cfg.basePoints * mult);
+      const points = pointsFor(this.combo, this.cfg, DIFFICULTIES[this.difficulty].scoreMult);
       this.score += points;
       this.correct++;
       this.events.push({ type: 'correct', t: this.time, item, y, side, points, mult, combo: this.combo });

@@ -1,4 +1,5 @@
 import { createHandler } from './handler';
+import type { Difficulty } from '../../src/core/config';
 import type { NewScore, ScoreRow, Store } from './store';
 
 /**
@@ -30,16 +31,20 @@ export interface Env {
 class D1Store implements Store {
   constructor(private db: D1Database) {}
 
-  async top(n: number): Promise<ScoreRow[]> {
-    const r = await this.db
-      .prepare('SELECT id, name, score, created_at AS createdAt FROM scores ORDER BY score DESC, created_at ASC, id ASC LIMIT ?')
-      .bind(n)
-      .all<ScoreRow>();
-    return r.results;
+  async top(n: number, difficulty?: Difficulty): Promise<ScoreRow[]> {
+    const cols = 'SELECT id, name, score, created_at AS createdAt, difficulty FROM scores';
+    const order = 'ORDER BY score DESC, created_at ASC, id ASC LIMIT ?';
+    const stmt = difficulty
+      ? this.db.prepare(`${cols} WHERE difficulty = ? ${order}`).bind(difficulty, n)
+      : this.db.prepare(`${cols} ${order}`).bind(n);
+    return (await stmt.all<ScoreRow>()).results;
   }
 
-  async countAbove(score: number): Promise<number> {
-    const r = await this.db.prepare('SELECT COUNT(*) AS n FROM scores WHERE score > ?').bind(score).first<{ n: number }>();
+  async countAbove(score: number, difficulty?: Difficulty): Promise<number> {
+    const stmt = difficulty
+      ? this.db.prepare('SELECT COUNT(*) AS n FROM scores WHERE score > ? AND difficulty = ?').bind(score, difficulty)
+      : this.db.prepare('SELECT COUNT(*) AS n FROM scores WHERE score > ?').bind(score);
+    const r = await stmt.first<{ n: number }>();
     return r?.n ?? 0;
   }
 
@@ -51,9 +56,9 @@ class D1Store implements Store {
   async insert(s: NewScore): Promise<number | null> {
     const r = await this.db
       .prepare(
-        'INSERT INTO scores (run_id, name, score, max_combo, play_ms, rule_ver, created_at) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(run_id) DO NOTHING RETURNING id',
+        'INSERT INTO scores (run_id, name, score, max_combo, play_ms, rule_ver, created_at, difficulty) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(run_id) DO NOTHING RETURNING id',
       )
-      .bind(s.runId, s.name, s.score, s.maxCombo, s.playMs, s.ruleVer, s.createdAt)
+      .bind(s.runId, s.name, s.score, s.maxCombo, s.playMs, s.ruleVer, s.createdAt, s.difficulty)
       .first<{ id: number }>();
     return r?.id ?? null;
   }

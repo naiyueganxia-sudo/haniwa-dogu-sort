@@ -28,6 +28,8 @@ export type GameEvent =
   | { type: 'wrong'; t: number; item: Item; y: number; side: Side }
   | { type: 'passed'; t: number; item: Item }
   | { type: 'milestone'; t: number; combo: number; mult: number }
+  /** 出てくる種類が増えた（詳細設計 17.2）。count は各分類の種類の数 */
+  | { type: 'unlock'; t: number; count: number }
   | { type: 'gameover'; t: number };
 
 export type PressResult = 'correct' | 'wrong' | 'ignored-over' | 'ignored-empty' | 'ignored-waiting';

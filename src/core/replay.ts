@@ -1,4 +1,4 @@
-import { DEFAULT_CONFIG, type GameConfig } from './config';
+import { DEFAULT_CONFIG, type Difficulty, type GameConfig } from './config';
 import { Game } from './game';
 import type { Side } from './types';
 
@@ -58,8 +58,13 @@ export function decodeLog(s: string): PressRecord[] | null {
  * 種と操作記録からゲームを最初から再現し、終了まで進めたゲームを返す。
  * 入力のない区間は出土品が流れ続けるので、最後の操作のあと必ずミス3回で終了する。
  */
-export function replay(seed: number, presses: readonly PressRecord[], cfg: GameConfig = DEFAULT_CONFIG): Game {
-  const g = new Game(seed, cfg);
+export function replay(
+  seed: number,
+  presses: readonly PressRecord[],
+  difficulty: Difficulty = 'normal',
+  cfg: GameConfig = DEFAULT_CONFIG,
+): Game {
+  const g = new Game(seed, difficulty, cfg);
   for (const p of presses) {
     if (g.status === 'over') break;
     g.press(p.side, p.ms / 1000);

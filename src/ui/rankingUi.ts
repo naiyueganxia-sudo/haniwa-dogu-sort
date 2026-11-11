@@ -1,16 +1,20 @@
+import { DIFFICULTIES, DIFFICULTY_ORDER, type Difficulty } from '../core/config';
 import { checkName } from '../core/name';
-import { qualifyRank, RANKING_SIZE, type RankEntry } from '../core/rankingTypes';
+import { qualifyRank, RANKING_SIZE, type RankEntry, type RankFilter } from '../core/rankingTypes';
 import type { RankingClient, SubmitResult } from '../net/ranking';
+import { setDiffTag } from './screens';
 
 /** このプレイの登録に必要なもの。登録できないプレイは token・log が null */
 export interface ResultContext {
   score: number;
   token: string | null;
   log: string | null;
+  difficulty: Difficulty;
 }
 
 export interface RankingUiHooks {
-  getBest(): number;
+  /** 難易度ごとの自己ベスト */
+  getBest(): Record<Difficulty, number>;
   getLastName(): string;
   setLastName(name: string): void;
   /** ランキング画面を開く（リザルトの［ランキングを見る］） */
@@ -89,21 +93,23 @@ export class RankingUi {
       return;
     }
     this.msg('ランキングを確認中…');
-    const entries = await this.client.fetchRanking();
+    // 全体の表とその難易度の表の両方を見る（D-39）
+    const [all, mine] = await Promise.all([this.client.fetchRanking('all'), this.client.fetchRanking(ctx.difficulty)]);
     if (gen !== this.gen) return;
-    if (!entries) {
+    if (!all || !mine) {
       this.msg('ランキングに接続できませんでした');
       this.setButtons({ retry: true });
       return;
     }
-    const rank = qualifyRank(entries, ctx.score);
-    if (rank === null) {
-      const last = entries[RANKING_SIZE - 1]!;
+    const rankAll = qualifyRank(all, ctx.score);
+    const rankDiff = qualifyRank(mine, ctx.score);
+    if (rankAll === null && rankDiff === null) {
+      const last = all[RANKING_SIZE - 1]!;
       this.msg(`30位まで あと ${(last.score - ctx.score + 1).toLocaleString('ja-JP')} 点`);
       this.setButtons({ view: true });
       return;
     }
-    this.msg(`ランキング ${rank}位 に入ります！`, true);
+    this.msg(`ランキング ${this.rankText(rankAll, rankDiff ?? 0, ctx.difficulty)} に入ります！`, true);
     this.regName.value = this.hooks.getLastName();
     this.regForm.hidden = false;
   }
@@ -136,7 +142,13 @@ export class RankingUi {
     this.regName.blur();
     this.setFormDisabled(true);
     this.regErr.textContent = '登録中…';
-    const r: SubmitResult = await this.client.submit({ token: ctx.token, name: nc.name, log: ctx.log, score: ctx.score });
+    const r: SubmitResult = await this.client.submit({
+      token: ctx.token,
+      name: nc.name,
+      log: ctx.log,
+      score: ctx.score,
+      difficulty: ctx.difficulty,
+    });
     if (gen !== this.gen) return;
     this.sending = false;
     this.setFormDisabled(false);
@@ -146,11 +158,13 @@ export class RankingUi {
       this.myId = r.res.id;
       this.ctx = null;
       this.regForm.hidden = true;
+      const inAll = r.res.rank <= RANKING_SIZE;
+      const inDiff = r.res.diffRank <= RANKING_SIZE;
       this.msg(
-        r.res.rank <= RANKING_SIZE
-          ? `${r.res.rank}位 に登録しました！`
+        inAll || inDiff
+          ? `${this.rankText(inAll ? r.res.rank : null, r.res.diffRank, ctx.difficulty)} に登録しました！`
           : `${r.res.rank}位 で登録しました（30位より下のため表には出ません）`,
-        r.res.rank <= RANKING_SIZE,
+        inAll || inDiff,
       );
       this.setButtons({ view: true });
       return;
@@ -175,6 +189,12 @@ export class RankingUi {
       default:
         this.end('登録できませんでした');
     }
+  }
+
+  /** 「全体 3位・激むず 1位」（全体に入らないときは「激むず 5位」） */
+  private rankText(rankAll: number | null, rankDiff: number, diff: Difficulty): string {
+    const d = `${DIFFICULTIES[diff].name} ${rankDiff}位`;
+    return rankAll === null ? d : `全体 ${rankAll}位・${d}`;
   }
 
   private end(text: string): void {
@@ -202,25 +222,72 @@ export class RankingUi {
 
   // ===== ランキング画面 =====
 
-  /** ランキング画面を開いたとき */
-  openScreen(): void {
+  /** 表示中の絞り込み（D-38） */
+  private filter: RankFilter = 'all';
+
+  /** ランキング画面を開いたとき。filter はタイトルからなら「すべて」、リザルトからならそのプレイの難易度 */
+  openScreen(filter: RankFilter = 'all'): void {
+    this.buildTabs();
+    // 自己ベスト（4つの難易度を並べる。詳細設計 17.6）
+    const best = this.hooks.getBest();
+    $('rank-bests').replaceChildren(
+      ...DIFFICULTY_ORDER.map((d) => {
+        const box = document.createElement('div');
+        const tag = document.createElement('span');
+        setDiffTag(tag, d);
+        box.append(tag, best[d].toLocaleString('ja-JP'));
+        return box;
+      }),
+    );
+    this.setFilter(filter);
+  }
+
+  private buildTabs(): void {
+    const box = $('rank-tabs');
+    if (box.childElementCount) return;
+    const filters: RankFilter[] = ['all', ...DIFFICULTY_ORDER];
+    for (const f of filters) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'rank-tab';
+      b.dataset.filter = f;
+      if (f !== 'all') b.dataset.diff = f;
+      b.setAttribute('role', 'tab');
+      b.textContent = f === 'all' ? 'すべて' : DIFFICULTIES[f].name;
+      b.addEventListener('click', () => {
+        b.blur();
+        this.setFilter(f);
+      });
+      box.append(b);
+    }
+  }
+
+  private setFilter(f: RankFilter): void {
+    this.filter = f;
+    document.querySelectorAll<HTMLElement>('.rank-tab').forEach((b) => {
+      const on = b.dataset.filter === f;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-selected', String(on));
+    });
     $('rank-wrap').scrollTop = 0;
-    document.querySelectorAll('.best-score').forEach((el) => (el.textContent = this.hooks.getBest().toLocaleString('ja-JP')));
-    if (this.client.entries) this.render(this.client.entries);
+    const cached = this.client.cachedRanking(f);
+    if (cached) this.render(cached);
     void this.loadRanking();
   }
 
   private async loadRanking(): Promise<void> {
+    const f = this.filter;
     const msg = $('rank-msg');
     $('rank-reload').hidden = true;
-    if (!this.client.entries) {
+    if (!this.client.cachedRanking(f)) {
       msg.textContent = '読み込み中…';
       msg.hidden = false;
       $('rank-list').replaceChildren();
     }
-    const entries = await this.client.fetchRanking();
+    const entries = await this.client.fetchRanking(f);
+    if (f !== this.filter) return; // 読み込み中に切り替えた
     if (entries) this.render(entries);
-    else if (!this.client.entries) {
+    else if (!this.client.cachedRanking(f)) {
       msg.textContent = 'ランキングを読み込めませんでした';
       $('rank-reload').hidden = false;
     }
@@ -236,18 +303,24 @@ export class RankingUi {
       if (e.rank <= 3) li.classList.add(`top${e.rank}`);
       if (e.id === this.myId) li.classList.add('mine');
       const d = new Date(e.at);
-      const cells: [string, string][] = [
-        ['rank-no', `${e.rank}`],
-        ['rank-name', e.name],
-        ['rank-score', e.score.toLocaleString('ja-JP')],
-        ['rank-date', `${d.getMonth() + 1}/${d.getDate()}`],
-      ];
-      for (const [cls, text] of cells) {
+      const cell = (cls: string, text: string) => {
         const span = document.createElement('span');
         span.className = cls;
         span.textContent = text;
-        li.append(span);
-      }
+        return span;
+      };
+      // 名前の横に難易度の札（D-32）
+      const name = document.createElement('span');
+      name.className = 'rank-name';
+      const tag = document.createElement('span');
+      setDiffTag(tag, e.difficulty in DIFFICULTIES ? e.difficulty : 'normal');
+      name.append(cell('rank-name-text', e.name), tag);
+      li.append(
+        cell('rank-no', `${e.rank}`),
+        name,
+        cell('rank-score', e.score.toLocaleString('ja-JP')),
+        cell('rank-date', `${d.getMonth() + 1}/${d.getDate()}`),
+      );
       return li;
     });
     $('rank-list').replaceChildren(...rows);

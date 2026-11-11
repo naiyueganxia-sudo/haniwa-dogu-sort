@@ -1,4 +1,4 @@
-import type { GameConfig } from './config';
+import { variantCountAt, type Difficulty, type GameConfig } from './config';
 import type { Rng } from './rng';
 import type { Category, Look } from './types';
 import { variantsOf } from '../data/artifacts';
@@ -20,6 +20,7 @@ export class Spawner {
   constructor(
     private readonly cfg: GameConfig,
     private readonly rng: Rng,
+    private readonly difficulty: Difficulty = 'normal',
   ) {
     this.variants = {
       haniwa: variantsOf('haniwa').map((v) => v.id),
@@ -78,9 +79,17 @@ export class Spawner {
     return cat;
   }
 
-  /** 種類：均等。ただし直前と同じ種類は避ける（詳細設計 12章#6） */
-  nextVariant(cat: Category): string {
-    const list = this.variants[cat];
+  /** n 番目の出土品で出てよい種類の数（各分類。詳細設計 17.2） */
+  variantCount(n: number): number {
+    return variantCountAt(n, this.difficulty, this.cfg);
+  }
+
+  /**
+   * 種類：その時点で出てよい種類（一覧の先頭から variantCount 個）から均等に選ぶ。
+   * ただし直前と同じ種類は避ける（詳細設計 12章#6・17.2）。n は累計出現数（0始まり）
+   */
+  nextVariant(cat: Category, n = 0): string {
+    const list = this.variants[cat].slice(0, this.variantCount(n));
     const prev = this.prevVariant[cat];
     const pool = list.length > 1 && prev !== null ? list.filter((v) => v !== prev) : list;
     const v = pool[this.rng.int(pool.length)]!;

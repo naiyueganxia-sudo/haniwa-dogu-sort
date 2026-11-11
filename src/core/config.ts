@@ -7,7 +7,7 @@
  * ルールの版（詳細設計 16.11）。DEFAULT_CONFIG の値やゲーム本体の計算を変えたら1つ上げ、
  * ランキングのサーバーも同時に更新する（同じ操作でも結果が変わり、古い記録を再計算できなくなるため）。
  */
-export const RULE_VERSION = 1;
+export const RULE_VERSION = 2;
 
 export type Point = readonly [x: number, y: number];
 
@@ -44,6 +44,8 @@ export interface GameConfig {
   lookRotDeg: number;
   lookFlip: number;
   paletteSize: number;
+  /** 出土品がこの数だけ出るごとに、出てくる種類が各分類1種ずつ増える（詳細設計 17.2） */
+  variantUnlockEvery: number;
   // 入力・時間
   simulWindowSec: number;
   maxFrameAdvanceSec: number;
@@ -104,11 +106,46 @@ export const DEFAULT_CONFIG: GameConfig = {
   lookFlip: 0.5,
   paletteSize: 6,
 
+  variantUnlockEvery: 15,
+
   simulWindowSec: 0.04,
   maxFrameAdvanceSec: 0.1,
   gameoverAnimSec: 1.0,
   retryLockSec: 0.8,
 };
+
+/** 難易度（要件定義書 第9章、詳細設計 17.1） */
+export type Difficulty = 'easy' | 'normal' | 'hard' | 'extreme';
+
+export interface DifficultyDef {
+  id: Difficulty;
+  name: string;
+  /** 最初に出てくる種類の数（各分類） */
+  startVariants: number;
+  /** 種類の上限（各分類） */
+  maxVariants: number;
+  /** スコア倍率（D-31） */
+  scoreMult: number;
+}
+
+export const DIFFICULTY_ORDER: readonly Difficulty[] = ['easy', 'normal', 'hard', 'extreme'];
+
+export const DIFFICULTIES: Record<Difficulty, DifficultyDef> = {
+  easy: { id: 'easy', name: 'かんたん', startVariants: 2, maxVariants: 4, scoreMult: 0.5 },
+  normal: { id: 'normal', name: 'ふつう', startVariants: 4, maxVariants: 10, scoreMult: 1.0 },
+  hard: { id: 'hard', name: 'むずかしい', startVariants: 6, maxVariants: 12, scoreMult: 1.5 },
+  extreme: { id: 'extreme', name: '激むず', startVariants: 8, maxVariants: 16, scoreMult: 2.0 },
+};
+
+export function isDifficulty(v: unknown): v is Difficulty {
+  return typeof v === 'string' && (DIFFICULTY_ORDER as readonly string[]).includes(v);
+}
+
+/** n 番目（0始まり）の出土品が出るときに出てよい種類の数（各分類） */
+export function variantCountAt(n: number, diff: Difficulty, cfg: GameConfig): number {
+  const d = DIFFICULTIES[diff];
+  return Math.min(d.maxVariants, d.startVariants + Math.floor(n / cfg.variantUnlockEvery));
+}
 
 /** 設定から導かれる値 */
 export interface Derived {

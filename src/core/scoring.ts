@@ -9,8 +9,9 @@ export function multiplierFor(combo: number, cfg: GameConfig): number {
   return mult;
 }
 
-export function pointsFor(combo: number, cfg: GameConfig): number {
-  return Math.round(cfg.basePoints * multiplierFor(combo, cfg));
+/** 1回の正解の点数＝100×コンボ倍率×難易度倍率（四捨五入。D-31） */
+export function pointsFor(combo: number, cfg: GameConfig, diffMult = 1): number {
+  return Math.round(cfg.basePoints * multiplierFor(combo, cfg) * diffMult);
 }
 
 /** コンボの節目（D-18：10/20/40/70/100、以後50ごと） */

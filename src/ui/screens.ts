@@ -1,11 +1,13 @@
+import { DIFFICULTIES, DIFFICULTY_ORDER, type Difficulty } from '../core/config';
 import type { Stats } from '../core/types';
-import { ARTIFACTS } from '../data/artifacts';
+import { ARTIFACTS, firstDifficultyOf } from '../data/artifacts';
 import { drawArtifact } from '../render/art';
 
-export type ScreenName = 'title' | 'howto' | 'pause' | 'ending' | 'result' | 'ranking';
+export type ScreenName = 'title' | 'difficulty' | 'howto' | 'pause' | 'ending' | 'result' | 'ranking';
 
 const IDS: Record<ScreenName, string> = {
   title: 'scr-title',
+  difficulty: 'scr-difficulty',
   howto: 'scr-howto',
   pause: 'scr-pause',
   ending: 'scr-ending',
@@ -16,6 +18,7 @@ const IDS: Record<ScreenName, string> = {
 /** DOMの画面（タイトル・遊び方・一時停止・終了・リザルト・ランキング） */
 export class Screens {
   constructor(onAction: (act: string) => void) {
+    this.buildDifficultyButtons();
     document.querySelectorAll<HTMLButtonElement>('[data-act]').forEach((b) => {
       b.addEventListener('click', () => {
         b.blur();
@@ -36,12 +39,20 @@ export class Screens {
     document.querySelectorAll('.mute-label').forEach((el) => (el.textContent = muted ? '音：オフ' : '音：オン'));
   }
 
-  setBest(best: number): void {
+  /** タイトルの自己ベスト（前回選んだ難易度のもの。詳細設計 17.6） */
+  setBest(diff: Difficulty, best: number): void {
+    document.querySelectorAll('.best-diff').forEach((el) => (el.textContent = DIFFICULTIES[diff].name));
     document.querySelectorAll('.best-score').forEach((el) => (el.textContent = best.toLocaleString('ja-JP')));
   }
 
-  fillResult(s: Stats, best: number, isNew: boolean): void {
+  /** 難易度を選ぶ画面で、選んでいる難易度に枠を付ける */
+  selectDifficulty(diff: Difficulty): void {
+    document.querySelectorAll<HTMLElement>('.diff-btn').forEach((b) => b.classList.toggle('selected', b.dataset.diff === diff));
+  }
+
+  fillResult(s: Stats, best: number, isNew: boolean, diff: Difficulty): void {
     const set = (id: string, v: string) => (document.getElementById(id)!.textContent = v);
+    setDiffTag(document.getElementById('r-diff')!, diff);
     set('r-score', s.score.toLocaleString('ja-JP'));
     document.getElementById('r-new')!.hidden = !isNew;
     set('r-correct', `${s.correct}`);
@@ -58,6 +69,29 @@ export class Screens {
     (document.getElementById('btn-retry') as HTMLButtonElement).disabled = !on;
   }
 
+  private buildDifficultyButtons(): void {
+    const box = document.getElementById('diff-list')!;
+    DIFFICULTY_ORDER.forEach((id, i) => {
+      const d = DIFFICULTIES[id];
+      const b = document.createElement('button');
+      b.className = 'btn diff-btn';
+      b.dataset.act = `diff:${id}`;
+      b.dataset.diff = id;
+      const name = document.createElement('span');
+      name.className = 'diff-name';
+      name.textContent = d.name;
+      const info = document.createElement('span');
+      info.className = 'diff-info';
+      const kinds = d.maxVariants >= 16 ? `${d.startVariants}→全${d.maxVariants}` : `${d.startVariants}→${d.maxVariants}`;
+      info.append(`種類 ${kinds}（各）`, document.createElement('br'), `点数 ×${d.scoreMult.toFixed(1)}`);
+      const key = document.createElement('span');
+      key.className = 'hint-keys only-desktop';
+      key.textContent = String(i + 1);
+      b.append(key, name, info);
+      box.append(b);
+    });
+  }
+
   private buildGallery(): void {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     for (const cat of ['haniwa', 'dogu'] as const) {
@@ -69,7 +103,10 @@ export class Screens {
         drawArtifact(cv.getContext('2d')!, a.id, 0, cv.width);
         const cap = document.createElement('figcaption');
         cap.textContent = a.name;
-        fig.append(cv, cap);
+        const tag = document.createElement('span');
+        const first = firstDifficultyOf(a.id);
+        setDiffTag(tag, first, first === 'extreme' ? '激むず' : `${DIFFICULTIES[first].name}〜`);
+        fig.append(cv, cap, tag);
         box.append(fig);
       }
     }
@@ -87,4 +124,11 @@ export class Screens {
       drawArtifact(cv.getContext('2d')!, v, pal, cv.width);
     }
   }
+}
+
+/** 難易度の札（色と文字。詳細設計 17.6、R15） */
+export function setDiffTag(el: HTMLElement, diff: Difficulty, text = DIFFICULTIES[diff].name): void {
+  el.classList.add('diff-tag');
+  el.dataset.diff = diff;
+  el.textContent = text;
 }

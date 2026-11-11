@@ -14,7 +14,7 @@
 
     <div id="app">
       <header id="hud" class="hud">
-        <div class="hud-score"><span class="hud-label">SCORE</span><span id="hud-score">0</span></div>
+        <div class="hud-score"><span id="hud-diff" class="diff-tag hud-diff"></span><span class="hud-label">SCORE</span><span id="hud-score">0</span></div>
         <div class="hud-combo" id="hud-combo-box">
           <span id="hud-mult" class="hud-mult">×1.0</span>
           <span id="hud-combo">0</span><span class="hud-label">COMBO</span>
@@ -48,9 +48,19 @@
         <button class="btn" data-act="howto">遊び方</button>
         <button class="btn needs-ranking" data-act="ranking">ランキング</button>
         <button class="btn small" data-act="mute"><span class="mute-label">音：オン</span></button>
-        <p class="best">自己ベスト <span class="best-score">0</span></p>
+        <p class="best">自己ベスト（<span class="best-diff">ふつう</span>） <span class="best-score">0</span></p>
         <p class="hint-keys only-desktop">Enter / Space でスタート</p>
         <p class="hint-portrait">縦画面での プレイがおすすめです</p>
+      </div>
+    </section>
+
+    <!-- 難易度を選ぶ（詳細設計 17.6） -->
+    <section id="scr-difficulty" class="screen" hidden>
+      <div class="panel">
+        <h2>難易度を選ぶ</h2>
+        <div id="diff-list" class="diff-list"></div>
+        <button class="btn" data-act="diff-back">もどる</button>
+        <p class="hint-keys only-desktop">↑↓ で選んで Enter ／ 1〜4 キー ／ Esc でもどる</p>
       </div>
     </section>
 
@@ -69,7 +79,9 @@
           <li>まちがえる・判定ラインを越えるとミス。<b>ミス3回で終了</b>です。</li>
           <li>連続で正解するとコンボ。コンボが続くほど得点が増えます（10コンボ ×1.2 ／ 20 ×1.5 ／ 40 ×2.0 ／ 70 ×2.5 ／ 100 ×3.0）。</li>
           <li>進むほど出土品が多く、速くなります。</li>
+          <li>難易度で、出てくる出土品の種類の数と点数の倍率が変わります（かんたん ×0.5／ふつう ×1.0／むずかしい ×1.5／激むず ×2.0）。遊んでいるうちに種類が増えていきます。</li>
         </ul>
+        <p class="note">絵の下の札は、その出土品が出てくる難易度です（「ふつう〜」なら、ふつう・むずかしい・激むずで出ます）。</p>
         <h3>はにわ（古墳時代）</h3>
         <div class="gallery" id="gallery-haniwa"></div>
         <h3>土偶（縄文時代）</h3>
@@ -101,7 +113,7 @@
     <!-- リザルト -->
     <section id="scr-result" class="screen" hidden>
       <div class="panel">
-        <h2>結果</h2>
+        <h2>結果 <span id="r-diff" class="diff-tag"></span></h2>
         <p class="result-score"><span id="r-score">0</span><span id="r-new" class="new" hidden>NEW!</span></p>
         <dl class="result-list">
           <dt>正解数</dt><dd id="r-correct"></dd>
@@ -138,7 +150,9 @@
     <section id="scr-ranking" class="screen" hidden>
       <div class="panel rank-panel">
         <h2>ランキング</h2>
-        <p class="rank-best">あなたの自己ベスト <b class="best-score">0</b> 点<span class="rank-best-note">（この端末）</span></p>
+        <p class="rank-best">あなたの自己ベスト<span class="rank-best-note">（この端末）</span></p>
+        <div id="rank-bests" class="rank-bests"></div>
+        <div id="rank-tabs" class="rank-tabs" role="tablist" aria-label="難易度で絞り込む"></div>
         <div id="rank-wrap" class="rank-wrap">
           <div class="rank-head" aria-hidden="true"><span>順位</span><span>名前</span><span>スコア</span><span>登録日</span></div>
           <p id="rank-msg" class="rank-msg">読み込み中…</p>

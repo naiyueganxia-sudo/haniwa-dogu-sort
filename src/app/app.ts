@@ -1,5 +1,5 @@
 import { Sfx } from '../audio/sfx';
-import { DEFAULT_CONFIG, type GameConfig } from '../core/config';
+import { DEFAULT_CONFIG, DIFFICULTIES, DIFFICULTY_ORDER, isDifficulty, type Difficulty, type GameConfig } from '../core/config';
 import { interpolate } from '../core/difficulty';
 import { Game } from '../core/game';
 import { InputArbiter } from '../core/inputArbiter';
@@ -18,7 +18,7 @@ import { GameClock } from './clock';
 import { computeLayout, decideMode, type Layout, type Mode } from './layout';
 import { load, save, type SaveData } from './storage';
 
-type Scene = 'title' | 'howto' | 'playing' | 'paused' | 'ending' | 'result' | 'ranking';
+type Scene = 'title' | 'difficulty' | 'howto' | 'playing' | 'paused' | 'ending' | 'result' | 'ranking';
 
 const COLOR_GOOD = '#f4d27a';
 const COLOR_BAD = '#ff6b62';
@@ -72,9 +72,9 @@ export class App {
     this.screens = new Screens((act) => this.action(act));
     this.sfx.muted = this.data.muted;
     this.screens.setMuted(this.data.muted);
-    this.screens.setBest(this.data.bestScore);
+    this.screens.setBest(this.data.lastDifficulty, this.data.best[this.data.lastDifficulty]);
     this.rankingUi = new RankingUi(this.ranking, {
-      getBest: () => this.data.bestScore,
+      getBest: () => this.data.best,
       getLastName: () => this.data.lastName,
       setLastName: (name) => {
         this.data.lastName = name;
@@ -144,8 +144,12 @@ export class App {
 
   private command(code: string): void {
     const s = this.scene;
+    if (s === 'difficulty') {
+      this.difficultyKey(code);
+      return;
+    }
     if (code === 'Space') {
-      if (s === 'title') this.start();
+      if (s === 'title') this.openDifficulty();
       else if (s === 'playing') this.pause();
       else if (s === 'paused') this.resume();
     } else if (code === 'Escape') {
@@ -154,22 +158,52 @@ export class App {
       else if (s === 'howto') this.action('back');
       else if (s === 'ranking') this.action('rank-back');
     } else if (code === 'Enter') {
-      if (s === 'title') this.start();
+      if (s === 'title') this.openDifficulty();
       else if (s === 'result') this.tryRetry();
     } else if (code === 'KeyR') {
       if (s === 'result') this.tryRetry();
     }
   }
 
+  /** 難易度を選ぶ画面のキー操作（詳細設計 17.6、R14） */
+  private difficultyKey(code: string): void {
+    const i = DIFFICULTY_ORDER.indexOf(this.data.lastDifficulty);
+    if (code === 'ArrowUp' || code === 'ArrowDown') {
+      const n = DIFFICULTY_ORDER.length;
+      this.data.lastDifficulty = DIFFICULTY_ORDER[(i + (code === 'ArrowUp' ? n - 1 : 1)) % n]!;
+      this.screens.selectDifficulty(this.data.lastDifficulty);
+    } else if (code === 'Enter' || code === 'Space') {
+      this.action(`diff:${this.data.lastDifficulty}`);
+    } else if (/^Digit[1-4]$/.test(code)) {
+      this.action(`diff:${DIFFICULTY_ORDER[Number(code.slice(5)) - 1]}`);
+    } else if (code === 'Escape') {
+      this.action('diff-back');
+    }
+  }
+
+  private openDifficulty(): void {
+    this.scene = 'difficulty';
+    this.screens.selectDifficulty(this.data.lastDifficulty);
+    this.screens.show('difficulty');
+  }
+
   private action(act: string): void {
     this.sfx.unlock();
+    if (act.startsWith('diff:')) {
+      const d = act.slice(5);
+      if (this.scene === 'difficulty' && isDifficulty(d)) this.start(d);
+      return;
+    }
     switch (act) {
       case 'start':
-        this.start();
+        this.openDifficulty();
+        break;
+      case 'diff-back':
+        this.toTitle();
         break;
       case 'retry':
         if (this.scene === 'result') this.tryRetry();
-        else this.start();
+        else this.start(this.game?.difficulty ?? this.data.lastDifficulty);
         break;
       case 'resume':
         this.resume();
@@ -191,7 +225,8 @@ export class App {
         this.rankingReturn = this.scene;
         this.scene = 'ranking';
         this.screens.show('ranking');
-        this.rankingUi.openScreen();
+        // タイトルからは「すべて」、リザルトからはそのプレイの難易度で開く（詳細設計 17.11）
+        this.rankingUi.openScreen(this.rankingReturn === 'result' && this.game ? this.game.difficulty : 'all');
         break;
       case 'rank-back':
         if (this.scene !== 'ranking') break;
@@ -208,14 +243,20 @@ export class App {
   }
 
   // ===== 進行 =====
-  private start(): void {
+  /** ゲームを始める（リトライは同じ難易度。D-34） */
+  private start(difficulty: Difficulty): void {
     this.sfx.unlock();
+    if (difficulty !== this.data.lastDifficulty) {
+      this.data.lastDifficulty = difficulty;
+      save(this.data);
+    }
     clearTimeout(this.endingTimer);
     this.rankingUi.leaveResult();
     // ランキング用の整理券があればその種で遊ぶ。なければ登録できないプレイになる（16.4）
     const run = this.seedParam === null ? this.ranking.takeRun() : null;
     this.runToken = run?.token ?? null;
-    this.game = new Game(this.seedParam ?? run?.seed ?? randomSeed(), this.cfg);
+    this.game = new Game(this.seedParam ?? run?.seed ?? randomSeed(), difficulty, this.cfg);
+    this.hud.setDifficulty(DIFFICULTIES[difficulty].name, difficulty);
     this.clock.start(performance.now());
     this.arbiter.reset();
     this.fx.clear();
@@ -262,13 +303,13 @@ export class App {
     this.game = null;
     this.fx.clear();
     this.scene = 'title';
-    this.screens.setBest(this.data.bestScore);
+    this.screens.setBest(this.data.lastDifficulty, this.data.best[this.data.lastDifficulty]);
     this.screens.show('title');
   }
 
   private tryRetry(): void {
     if (performance.now() < this.retryLockUntil) return;
-    this.start();
+    this.start(this.game?.difficulty ?? this.data.lastDifficulty);
   }
 
   private gameOver(): void {
@@ -284,17 +325,18 @@ export class App {
   private showResult(): void {
     if (!this.game) return;
     const s = this.game.stats();
-    const isNew = s.score > this.data.bestScore;
+    const diff = this.game.difficulty;
+    const isNew = s.score > this.data.best[diff];
     if (isNew) {
-      this.data.bestScore = s.score;
+      this.data.best[diff] = s.score;
       save(this.data);
     }
-    this.screens.fillResult(s, this.data.bestScore, isNew);
+    this.screens.fillResult(s, this.data.best[diff], isNew, diff);
     this.scene = 'result';
     this.screens.show('result');
     // ランキング（16.9）。次のゲーム用の整理券もここで取る（プレイ中は通信しない）
     const log = this.runToken ? encodeLog(this.game.pressLog) : null;
-    void this.rankingUi.startResult({ score: s.score, token: log === null ? null : this.runToken, log });
+    void this.rankingUi.startResult({ score: s.score, token: log === null ? null : this.runToken, log, difficulty: diff });
     this.runToken = null;
     this.ranking.prefetchRun();
     this.retryLockUntil = performance.now() + this.cfg.retryLockSec * 1000;
@@ -338,6 +380,9 @@ export class App {
         case 'milestone':
           this.hud.milestone(e.combo, e.mult);
           this.sfx.milestone();
+          break;
+        case 'unlock':
+          this.hud.unlock();
           break;
         case 'gameover':
           this.gameOver();

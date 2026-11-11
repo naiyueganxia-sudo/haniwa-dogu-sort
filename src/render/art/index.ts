@@ -1,8 +1,10 @@
 import { CLAY_PALETTE, type ArtFn } from './common';
 import { DOGU_ART } from './dogu';
+import { DOGU_ART_2 } from './dogu2';
 import { HANIWA_ART } from './haniwa';
+import { HANIWA_ART_2 } from './haniwa2';
 
-export const ART: Record<string, ArtFn> = { ...HANIWA_ART, ...DOGU_ART };
+export const ART: Record<string, ArtFn> = { ...HANIWA_ART, ...HANIWA_ART_2, ...DOGU_ART, ...DOGU_ART_2 };
 
 /** 100×100 の絵を、size ピクセル四方のキャンバスに描く */
 export function drawArtifact(ctx: CanvasRenderingContext2D, variantId: string, palette: number, size: number): void {

@@ -7,9 +7,11 @@ CREATE TABLE IF NOT EXISTS scores (
   max_combo  INTEGER NOT NULL,
   play_ms    INTEGER NOT NULL,
   rule_ver   INTEGER NOT NULL,
-  created_at INTEGER NOT NULL          -- 登録時刻（ミリ秒）
+  created_at INTEGER NOT NULL,         -- 登録時刻（ミリ秒）
+  difficulty TEXT    NOT NULL DEFAULT 'normal'  -- 難易度（詳細設計 17.5。ルールの版1の記録は normal）
 );
 CREATE INDEX IF NOT EXISTS scores_rank ON scores (score DESC, created_at ASC);
+CREATE INDEX IF NOT EXISTS scores_diff_rank ON scores (difficulty, score DESC, created_at ASC);
 
 -- 連続投稿の判定用（接続元はハッシュ。1時間で消す）
 CREATE TABLE IF NOT EXISTS rate (

@@ -1,4 +1,4 @@
-import { RULE_VERSION } from '../../src/core/config';
+import { isDifficulty, RULE_VERSION, type Difficulty } from '../../src/core/config';
 import { checkName } from '../../src/core/name';
 import {
   RANKING_SIZE,
@@ -37,7 +37,8 @@ const LOCAL_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
 
 export function createHandler(deps: HandlerDeps): (req: Request) => Promise<Response> {
   const now = deps.now ?? (() => Date.now());
-  let cache: { at: number; rows: ScoreRow[] } | null = null;
+  /** 絞り込みごとのキャッシュ（10秒。R5） */
+  let cache = new Map<string, { at: number; rows: ScoreRow[] }>();
 
   const originOk = (o: string | null) => !!o && (deps.allowedOrigins.includes(o) || LOCAL_ORIGIN.test(o));
 
@@ -61,16 +62,25 @@ export function createHandler(deps: HandlerDeps): (req: Request) => Promise<Resp
 
   const fail = (req: Request, error: SubmitError, status = 400) => json(req, { error }, status);
 
-  const topRows = async (): Promise<ScoreRow[]> => {
+  const topRows = async (difficulty?: Difficulty): Promise<ScoreRow[]> => {
     const t = now();
-    if (cache && t - cache.at < LIMITS.rankingCacheMs) return cache.rows;
-    const rows = await deps.store.top(RANKING_SIZE);
-    cache = { at: t, rows };
+    const key = difficulty ?? 'all';
+    const c = cache.get(key);
+    if (c && t - c.at < LIMITS.rankingCacheMs) return c.rows;
+    const rows = await deps.store.top(RANKING_SIZE, difficulty);
+    cache.set(key, { at: t, rows });
     return rows;
   };
 
   const toEntries = (rows: readonly ScoreRow[]): RankEntry[] =>
-    withRanks(rows).map((r) => ({ id: r.id, rank: r.rank, name: r.name, score: r.score, at: r.createdAt }));
+    withRanks(rows).map((r) => ({
+      id: r.id,
+      rank: r.rank,
+      name: r.name,
+      score: r.score,
+      at: r.createdAt,
+      difficulty: isDifficulty(r.difficulty) ? r.difficulty : 'normal',
+    }));
 
   async function submit(req: Request): Promise<Response> {
     // 1. 呼び出し元
@@ -106,11 +116,12 @@ export function createHandler(deps: HandlerDeps): (req: Request) => Promise<Resp
     // 5. 使い回し
     if (await deps.store.hasRun(ticket.r)) return fail(req, 'duplicate', 409);
 
-    // 6. 再計算
-    if (typeof body.log !== 'string') return fail(req, 'invalid');
+    // 6. 再計算（難易度ごとに種を混ぜて再現する。詳細設計 17.4）
+    if (typeof body.log !== 'string' || !isDifficulty(body.difficulty)) return fail(req, 'invalid');
+    const difficulty = body.difficulty;
     const presses = decodeLog(body.log);
     if (!presses) return fail(req, 'invalid');
-    const g = replay(ticket.s, presses);
+    const g = replay(ticket.s, presses, difficulty);
     const s = g.stats();
     if (g.status !== 'over' || s.score <= 0 || s.score !== body.score) return fail(req, 'invalid');
     const playMs = Math.round(s.playTimeSec * 1000);
@@ -126,11 +137,13 @@ export function createHandler(deps: HandlerDeps): (req: Request) => Promise<Resp
       playMs,
       ruleVer: RULE_VERSION,
       createdAt: t,
+      difficulty,
     });
     if (id === null) return fail(req, 'duplicate', 409);
-    cache = null;
+    cache = new Map();
     const rank = (await deps.store.countAbove(s.score)) + 1;
-    const res: SubmitResponse = { id, rank, entries: toEntries(await topRows()) };
+    const diffRank = (await deps.store.countAbove(s.score, difficulty)) + 1;
+    const res: SubmitResponse = { id, rank, diffRank, entries: toEntries(await topRows()) };
     return json(req, res);
   }
 
@@ -145,7 +158,9 @@ export function createHandler(deps: HandlerDeps): (req: Request) => Promise<Resp
         return json(req, res);
       }
       if (req.method === 'GET' && path === '/api/ranking') {
-        const res: RankingResponse = { entries: toEntries(await topRows()), ruleVersion: RULE_VERSION };
+        // ?difficulty=easy などで、その難易度だけの上位30位（D-38）。知らない値は全体
+        const q = new URL(req.url).searchParams.get('difficulty');
+        const res: RankingResponse = { entries: toEntries(await topRows(isDifficulty(q) ? q : undefined)), ruleVersion: RULE_VERSION };
         return json(req, res);
       }
       if (req.method === 'POST' && path === '/api/scores') return await submit(req);

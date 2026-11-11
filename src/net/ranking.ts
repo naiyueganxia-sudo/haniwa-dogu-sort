@@ -1,5 +1,6 @@
 import { RULE_VERSION } from '../core/config';
 import type {
+  RankFilter,
   RankEntry,
   RankingResponse,
   RunResponse,
@@ -43,8 +44,12 @@ export class RankingClient {
   readonly enabled = BASE !== '';
   private run: Run | null = null;
   private runLoading = false;
-  /** 直近に受け取った上位の表 */
-  entries: RankEntry[] | null = null;
+  /** 直近に受け取った上位の表（絞り込みごと。D-38） */
+  private cached = new Map<RankFilter, RankEntry[]>();
+
+  cachedRanking(filter: RankFilter = 'all'): RankEntry[] | null {
+    return this.cached.get(filter) ?? null;
+  }
 
   /** 次のゲーム用の整理券を先に取っておく（16.4） */
   prefetchRun(): void {
@@ -69,13 +74,14 @@ export class RankingClient {
     return r;
   }
 
-  async fetchRanking(): Promise<RankEntry[] | null> {
+  /** 上位30件。filter に難易度を渡すと、その難易度だけの上位30位 */
+  async fetchRanking(filter: RankFilter = 'all'): Promise<RankEntry[] | null> {
     if (!this.enabled) return null;
     try {
-      const r = await call<RankingResponse>('/api/ranking');
+      const r = await call<RankingResponse>(filter === 'all' ? '/api/ranking' : '/api/ranking?difficulty=' + filter);
       if (!r.ok || !Array.isArray(r.data.entries)) return null;
-      this.entries = r.data.entries;
-      return this.entries;
+      this.cached.set(filter, r.data.entries);
+      return r.data.entries;
     } catch {
       return null;
     }
@@ -91,7 +97,8 @@ export class RankingClient {
         body: JSON.stringify(body),
       });
       if (r.ok) {
-        this.entries = r.data.entries;
+        // 登録したら、絞り込んだ表は古くなるので捨てる
+        this.cached = new Map([['all', r.data.entries]]);
         return { ok: true, res: r.data };
       }
       const err = (r.data as { error?: SubmitError } | null)?.error;

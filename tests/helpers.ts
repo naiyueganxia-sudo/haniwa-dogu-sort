@@ -1,3 +1,4 @@
+import type { Difficulty } from '../src/core/config';
 import { Game } from '../src/core/game';
 import { quantize } from '../src/core/replay';
 import { Rng } from '../src/core/rng';
@@ -10,6 +11,7 @@ export interface PlayOptions {
   errorRate?: number;
   /** この秒数を過ぎたら押すのをやめる（そのあと見逃しで終了する） */
   stopAfterSec?: number;
+  difficulty?: Difficulty;
 }
 
 /**
@@ -17,7 +19,7 @@ export interface PlayOptions {
  * ばらばらの刻みのフレーム、ミリ秒に丸めた時刻、フレームより前の時刻の入力、ときどき無視される入力。
  */
 export function playLikeApp(seed: number, rngSeed: number, opt: PlayOptions = {}): Game {
-  const g = new Game(seed);
+  const g = new Game(seed, opt.difficulty ?? 'normal');
   const r = new Rng(rngSeed);
   const err = opt.errorRate ?? 0.01;
   const stop = opt.stopAfterSec ?? Infinity;

@@ -34,9 +34,25 @@ export class Hud {
     this.bumpTimer = window.setTimeout(() => this.elBox.classList.remove('bump'), 90);
   }
 
+  /** 難易度の表示（詳細設計 17.6） */
+  setDifficulty(name: string, id: string): void {
+    const el = document.getElementById('hud-diff')!;
+    el.textContent = name;
+    el.dataset.diff = id;
+  }
+
   milestone(combo: number, mult: number): void {
+    this.flash(`${combo} COMBO!  ×${mult.toFixed(1)}`);
+  }
+
+  /** 新しい種類が加わったとき（詳細設計 17.2、R12）。名前は出さない */
+  unlock(): void {
+    this.flash('新しい出土品が加わった！');
+  }
+
+  private flash(text: string): void {
     const el = this.elMilestone;
-    el.textContent = `${combo} COMBO!  ×${mult.toFixed(1)}`;
+    el.textContent = text;
     el.hidden = true;
     void el.offsetWidth; // アニメーションをやり直す
     el.hidden = false;

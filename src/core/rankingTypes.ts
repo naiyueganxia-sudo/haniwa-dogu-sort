@@ -1,4 +1,6 @@
-/** ランキングの通信の形（詳細設計 16.8）。ブラウザとサーバーで共用する。 */
+import type { Difficulty } from './config';
+
+/** ランキングの通信の形（詳細設計 16.8・17.5）。ブラウザとサーバーで共用する。 */
 
 export const RANKING_SIZE = 30;
 
@@ -9,6 +11,7 @@ export interface RankEntry {
   score: number;
   /** 登録時刻（ミリ秒） */
   at: number;
+  difficulty: Difficulty;
 }
 
 export interface RunResponse {
@@ -27,14 +30,22 @@ export interface SubmitRequest {
   name: string;
   log: string;
   score: number;
+  difficulty: Difficulty;
   ruleVersion: number;
 }
 
 export interface SubmitResponse {
   id: number;
+  /** 全体の順位 */
   rank: number;
+  /** その難易度の中の順位（詳細設計 17.11） */
+  diffRank: number;
+  /** 全体の上位30件 */
   entries: RankEntry[];
 }
+
+/** ランキングの絞り込み（D-38）。'all' は全体 */
+export type RankFilter = Difficulty | 'all';
 
 export type SubmitError =
   | 'origin'

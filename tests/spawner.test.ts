@@ -55,13 +55,13 @@ describe('出現の抽選（D-07, C-28〜C-30）', () => {
     expect(count.bias / blocks).toBeCloseTo(0.15, 1);
   });
 
-  it('種類は直前と同じにならず、全種類が出る', () => {
-    const s = new Spawner(C, new Rng(5));
+  it('種類は直前と同じにならず、激むずでは（上限に達したあと）全種類が出る', () => {
+    const s = new Spawner(C, new Rng(5), 'extreme');
     for (const cat of ['haniwa', 'dogu'] as const) {
       const seen = new Set<string>();
       let prev = '';
       for (let i = 0; i < 2000; i++) {
-        const v = s.nextVariant(cat);
+        const v = s.nextVariant(cat, 1000);
         expect(v).not.toBe(prev);
         prev = v;
         seen.add(v);
