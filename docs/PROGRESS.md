@@ -4,7 +4,7 @@
 
 ## 現在の段階
 
-**追加機能「難易度の選択・種類の追加」：L1〜L4（core・新しい16種の絵・画面・サーバー）をローカルで実装・確認済み（2026-11-11）。L5：新しい絵はユーザーが確認し「絵はOK」（2026-11-11）。リリース（L6）の時期はユーザーが決める。** 未コミット・未push（公開中のゲームは変わっていない）。
+**追加機能「難易度の選択・種類の追加」：2026-11-11 にリリース済み（コミット `df2cf13`）。公開URLで確認済み。次は実機での確認と、第4段階（難易度の差の感想・調整）。**
 
 本番のランキングは、ユーザーの試用データと Claude の確認用データを消した0件の状態から開始。
 ランキングのサーバー：https://haniwa-dogu-ranking.haniwa-dogu-sort.workers.dev （ユーザーの Cloudflare アカウント、Worker 名 haniwa-dogu-ranking、D1 データベース haniwa-dogu-ranking〔APAC〕）
@@ -22,7 +22,7 @@
 | 追加：ランキング 実装・公開 | 完了・リリース済み（2026-11-10） | `src/core/replay.ts`・`name.ts`・`rankingTypes.ts`、`src/net/ranking.ts`、`src/ui/rankingUi.ts`、`server/` |
 | 追加：難易度・種類 要件定義 | 承認済み（2026-11-11、選択式の質問への回答で確定） | [01_requirements.md](01_requirements.md) 第9章 |
 | 追加：難易度・種類 詳細設計 | 承認済み（2026-11-11、承認して実装へ） | [02_design.md](02_design.md) 第17章 |
-| 追加：難易度・種類 実装 | L1〜L4 と難易度フィルター 完了（ローカル）。L5 絵の確認済み、L6 リリースはユーザーの合図待ち | `src/core/config.ts`（難易度）、`src/render/art/haniwa2.ts`・`dogu2.ts`、`server/migrations/0002_difficulty.sql` |
+| 追加：難易度・種類 実装・公開 | 完了・リリース済み（2026-11-11） | `src/core/config.ts`（難易度）、`src/render/art/haniwa2.ts`・`dogu2.ts`、`server/migrations/0002_difficulty.sql` |
 
 ## 難易度・種類の確認結果（2026-11-11、ローカル）
 
@@ -94,13 +94,11 @@
 | 2026-11-11 | 詳細設計 第17章「承認して実装へ」。L1〜L4 を実装しローカルで確認（未コミット） |
 | 2026-11-11 | 実装中に「ランキング 難易度ごとにフィルターできるといいかも」→ 選択式の質問で D-38・D-39 を確定し、実装・確認 |
 | 2026-11-11 | 新しい16種の絵をユーザーが確認「絵はOK」 |
+| 2026-11-11 | ユーザー「今リリースして」「今のデータ引き継いでね」。本番DBに難易度の列と索引を追加（既存2件は「ふつう」として残る）→ サーバー版2を公開 → コミット `df2cf13` を push（デプロイ約30秒）。公開URLで難易度選択・激むず・登録「全体 3位・激むず 1位」を確認し、確認用の記録を削除。本番のランキングは元の2件のみ |
 
 ## 次の作業
 
-1. 難易度・種類：リリースの時期をユーザーに確認し、設計書 17.8 の手順で公開：
-   1. 本番DBに `npx wrangler d1 execute haniwa-dogu-ranking --remote --config server/wrangler.jsonc --file server/migrations/0002_difficulty.sql`
-   2. `npm run server:deploy` → 直後にコミットして main に push（ゲームの公開に約5分）
-   3. 公開URLで4難易度を確認し、確認用の記録を消す
+1. 難易度・種類：リリース済み。実機での確認と、難易度の差（とくに激むずの厳しさ。D-37 の注意）の感想を受け取る。足りなければ速さ・ミス上限の案を改めて提案する（ユーザーの承認が必要）。
 1. ランキング：実機（iPhone Safari・Android Chrome）で名前の入力と登録を試してもらう。不適切な名前の削除依頼があれば `npx wrangler d1 execute haniwa-dogu-ranking --remote --config server/wrangler.jsonc --command "DELETE FROM scores WHERE id = …"`（先に SELECT で確認する。D-27）。
    - サーバーを更新するとき：`npm run server:deploy`（Claude がこのPCから。wrangler のログインは済み）。core や config の数値を変えたら `RULE_VERSION` を上げ、サーバーとゲームを同時に更新し、ランキングを残すか消すかをユーザーに確認する（設計書 16.11、R7）。
    - 本番サーバーにつないで試すとき：`.claude/launch.json` の `game-prodapi`（localhost:5175）。登録した記録は本番に入るので、試した後は消す。
@@ -110,7 +108,7 @@
 
 ## 保留中の質問
 
-- ドキュメント更新のコミット `b51b3c5` は未push（次のリリースと一緒に push する）。
+- ドキュメント更新のコミットは未push（次のリリースと一緒に push する）。
 
 ## 開発環境メモ
 
