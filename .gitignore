@@ -3,3 +3,5 @@ dist
 server/.dev.vars
 server/.wrangler
 .wrangler
+demo/node_modules
+demo/out
