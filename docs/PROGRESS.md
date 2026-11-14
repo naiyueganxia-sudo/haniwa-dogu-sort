@@ -98,7 +98,7 @@
 
 ## 次の作業
 
-1. デモムービー：完成（2026-11-14 ユーザー「これでOK」）。録画の道具 `demo/` とドキュメントは未コミット（頼まれたとき・次のリリースのときにコミット）。作り直しは `cd demo && npm run record`。動画は `demo/out/`（Git に入れない）、本番には上げない。
+1. デモムービー：完成（2026-11-14 ユーザー「これでOK」）。録画の道具 `demo/` はコミット済み（`1ed838c`、未push。次のリリースと一緒に push する）。作り直しは `cd demo && npm run record`。動画は `demo/out/`（Git に入れない）、本番には上げない。
 
 1. 難易度・種類：リリース済み。実機での確認と、難易度の差（とくに激むずの厳しさ。D-37 の注意）の感想を受け取る。足りなければ速さ・ミス上限の案を改めて提案する（ユーザーの承認が必要）。
 1. ランキング：実機（iPhone Safari・Android Chrome）で名前の入力と登録を試してもらう。不適切な名前の削除依頼があれば `npx wrangler d1 execute haniwa-dogu-ranking --remote --config server/wrangler.jsonc --command "DELETE FROM scores WHERE id = …"`（先に SELECT で確認する。D-27）。
