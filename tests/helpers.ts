@@ -1,8 +1,9 @@
-import type { Difficulty } from '../src/core/config';
+import { DEFAULT_CONFIG, type PlayMode } from '../src/core/config';
+import type { CustomSettings } from '../src/core/custom';
 import { Game } from '../src/core/game';
 import { quantize } from '../src/core/replay';
 import { Rng } from '../src/core/rng';
-import { SIDE_OF, type Side } from '../src/core/types';
+import { SIDE_OF, type GameEvent, type Side } from '../src/core/types';
 
 const opposite = (s: Side): Side => (s === 'L' ? 'R' : 'L');
 
@@ -11,7 +12,11 @@ export interface PlayOptions {
   errorRate?: number;
   /** この秒数を過ぎたら押すのをやめる（そのあと見逃しで終了する） */
   stopAfterSec?: number;
-  difficulty?: Difficulty;
+  difficulty?: PlayMode;
+  /** カスタムの設定（difficulty が 'custom' のとき） */
+  custom?: CustomSettings;
+  /** 出来事を受け取る（テスト用） */
+  onEvents?: (events: GameEvent[]) => void;
 }
 
 /**
@@ -19,7 +24,7 @@ export interface PlayOptions {
  * ばらばらの刻みのフレーム、ミリ秒に丸めた時刻、フレームより前の時刻の入力、ときどき無視される入力。
  */
 export function playLikeApp(seed: number, rngSeed: number, opt: PlayOptions = {}): Game {
-  const g = new Game(seed, opt.difficulty ?? 'normal');
+  const g = new Game(seed, opt.difficulty ?? 'normal', DEFAULT_CONFIG, opt.custom);
   const r = new Rng(rngSeed);
   const err = opt.errorRate ?? 0.01;
   const stop = opt.stopAfterSec ?? Infinity;
@@ -38,7 +43,8 @@ export function playLikeApp(seed: number, rngSeed: number, opt: PlayOptions = {}
         g.press(r.chance(err) ? opposite(right) : right, tEvent);
       }
     }
-    g.drainEvents();
+    const ev = g.drainEvents();
+    opt.onEvents?.(ev);
   }
   return g;
 }

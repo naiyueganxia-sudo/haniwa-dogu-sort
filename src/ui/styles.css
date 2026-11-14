@@ -693,6 +693,7 @@ body.mode-landscape .milestone {
 .diff-tag[data-diff='normal'] { background: #d9b38c; }
 .diff-tag[data-diff='hard'] { background: #f0a050; }
 .diff-tag[data-diff='extreme'] { background: #ff6b62; color: #fff; }
+.diff-tag[data-diff='custom'] { background: #a98ae6; color: #fff; }
 .hud-diff {
   margin-right: 6px;
   align-self: center;
@@ -783,4 +784,152 @@ body.mode-landscape .milestone {
 .rank-tab.on[data-diff='extreme'] {
   background: #ff6b62;
   color: #fff;
+}
+
+/* カスタム（詳細設計 19.4） */
+.diff-btn[data-diff='custom'] .diff-name {
+  color: #c7b2f5;
+}
+.cus-panel {
+  max-height: none;
+}
+#scr-custom {
+  overflow-y: auto;
+  align-items: start;
+}
+.cus-panel h2 .diff-tag {
+  font-size: 12px;
+  vertical-align: middle;
+}
+.cus-block {
+  margin: 10px 0;
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.cus-speed-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cus-label {
+  font-weight: 700;
+  white-space: nowrap;
+}
+.cus-speed-row input[type='range'] {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--gold);
+  height: 28px;
+}
+.btn.small.cus-step {
+  width: 40px;
+  min-width: 40px;
+  margin: 0;
+  padding: 6px 0;
+  font-size: 18px;
+}
+.cus-speed-text {
+  margin: 4px 0 8px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--gold);
+}
+.cus-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+.cus-toggle input {
+  width: 22px;
+  height: 22px;
+  accent-color: var(--gold);
+}
+.cus-toggle small {
+  color: var(--ink-dim);
+  font-weight: 500;
+}
+.cus-cat-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.cus-cat-head h3 {
+  margin: 0;
+  font-size: 16px;
+}
+.cus-count {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-dim);
+}
+.cus-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+.btn.small.cus-tool {
+  width: auto;
+  margin: 0;
+  padding: 5px 9px;
+  font-size: 12px;
+}
+.cus-n {
+  min-width: 20px;
+  text-align: center;
+  font-weight: 800;
+}
+.cus-from {
+  color: var(--ink-dim);
+}
+.cus-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  gap: 6px;
+}
+.cus-chip {
+  font: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 2px;
+  border-radius: 10px;
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--ink-dim);
+  font-size: 11px;
+  line-height: 1.2;
+  cursor: pointer;
+  touch-action: manipulation;
+  opacity: 0.55;
+}
+.cus-chip canvas {
+  width: 44px;
+  height: 44px;
+  filter: grayscale(0.8);
+}
+.cus-chip.on {
+  opacity: 1;
+  color: var(--ink);
+  border-color: var(--gold);
+  background: rgba(232, 184, 90, 0.14);
+}
+.cus-chip.on canvas {
+  filter: none;
+}
+.cus-ratio {
+  margin: 8px 0;
+  text-align: center;
+  font-weight: 700;
+}
+.cus-ratio.warn {
+  color: #ff8a80;
 }

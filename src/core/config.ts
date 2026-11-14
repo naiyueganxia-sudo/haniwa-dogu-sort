@@ -128,6 +128,9 @@ export interface DifficultyDef {
   scoreMult: number;
 }
 
+/** 遊び方の種類：4つの難易度かカスタム（詳細設計 19.2）。カスタムはランキングに使わない */
+export type PlayMode = Difficulty | 'custom';
+
 export const DIFFICULTY_ORDER: readonly Difficulty[] = ['easy', 'normal', 'hard', 'extreme'];
 
 export const DIFFICULTIES: Record<Difficulty, DifficultyDef> = {

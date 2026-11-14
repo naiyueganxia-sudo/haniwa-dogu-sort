@@ -1,4 +1,5 @@
-import { variantCountAt, type Difficulty, type GameConfig } from './config';
+import { variantCountAt, type GameConfig, type PlayMode } from './config';
+import type { CustomSettings } from './custom';
 import type { Rng } from './rng';
 import type { Category, Look } from './types';
 import { variantsOf } from '../data/artifacts';
@@ -16,16 +17,28 @@ export class Spawner {
   private prev: Category | null = null;
   private prevVariant: Record<Category, string | null> = { haniwa: null, dogu: null };
   private readonly variants: Record<Category, string[]>;
+  /** カスタムのとき、はにわの基準の割合（選んだ数の割合。D-48）。4つの難易度では null */
+  private readonly customRatio: number | null = null;
 
   constructor(
     private readonly cfg: GameConfig,
     private readonly rng: Rng,
-    private readonly difficulty: Difficulty = 'normal',
+    private readonly difficulty: PlayMode = 'normal',
+    custom?: CustomSettings,
   ) {
-    this.variants = {
-      haniwa: variantsOf('haniwa').map((v) => v.id),
-      dogu: variantsOf('dogu').map((v) => v.id),
+    const pick = (cat: Category) => {
+      const all = variantsOf(cat).map((v) => v.id);
+      if (difficulty !== 'custom' || !custom) return all;
+      const set = new Set(custom.variants);
+      return all.filter((id) => set.has(id));
     };
+    this.variants = { haniwa: pick('haniwa'), dogu: pick('dogu') };
+    if (difficulty === 'custom') {
+      const h = this.variants.haniwa.length;
+      const d = this.variants.dogu.length;
+      if (h + d === 0) throw new Error('カスタムで出土品が1つも選ばれていない');
+      this.customRatio = h / (h + d);
+    }
   }
 
   get currentPattern(): PatternKind {
@@ -51,7 +64,13 @@ export class Spawner {
         p = this.biasSide === 'haniwa' ? c.biasRatio : 1 - c.biasRatio;
         break;
     }
-    return Math.min(1 - c.probMin, Math.max(c.probMin, p));
+    p = Math.min(1 - c.probMin, Math.max(c.probMin, p));
+    const r = this.customRatio;
+    if (r === null) return p;
+    // カスタム：選んだ数の割合 r に合わせてずらす（詳細設計 19.3、R20）。r = 0.5 なら今と同じ
+    if (r <= 0) return 0;
+    if (r >= 1) return 1;
+    return (p * r) / (p * r + (1 - p) * (1 - r));
   }
 
   private drawPattern(): void {
@@ -81,6 +100,8 @@ export class Spawner {
 
   /** n 番目の出土品で出てよい種類の数（各分類。詳細設計 17.2） */
   variantCount(n: number): number {
+    // カスタムは選んだものが最初から全部出て、増えない（D-47）
+    if (this.difficulty === 'custom') return Math.max(this.variants.haniwa.length, this.variants.dogu.length);
     return variantCountAt(n, this.difficulty, this.cfg);
   }
 

@@ -1,4 +1,5 @@
-import { DEFAULT_CONFIG, DIFFICULTIES, DIFFICULTY_ORDER, derive, type Derived, type Difficulty, type GameConfig } from './config';
+import { DEFAULT_CONFIG, DIFFICULTIES, DIFFICULTY_ORDER, derive, type Derived, type GameConfig, type PlayMode } from './config';
+import type { CustomSettings } from './custom';
 import { spacingFor, speedFor } from './difficulty';
 import { Rng } from './rng';
 import { isMilestone, multiplierFor, pointsFor } from './scoring';
@@ -11,8 +12,9 @@ import { zoneOf } from './zones';
  * 乱数の種を難易度で混ぜる（詳細設計 17.4、R13）。
  * 同じ整理券でも難易度が違えば出土品の並びが変わり、難易度を偽った操作記録は再計算で合わなくなる。
  */
-export function mixSeed(seed: number, difficulty: Difficulty): number {
-  const k = DIFFICULTY_ORDER.indexOf(difficulty) + 1;
+export function mixSeed(seed: number, difficulty: PlayMode): number {
+  // カスタムは5（今の4つの番号は変えない。詳細設計 19.3）
+  const k = difficulty === 'custom' ? 5 : DIFFICULTY_ORDER.indexOf(difficulty) + 1;
   let h = (seed ^ Math.imul(k, 0x9e3779b9)) >>> 0;
   h = Math.imul(h ^ (h >>> 16), 0x85ebca6b) >>> 0;
   h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35) >>> 0;
@@ -56,14 +58,35 @@ export class Game {
   private segT = 0;
   private segD = 0;
 
-  readonly difficulty: Difficulty;
+  readonly difficulty: PlayMode;
+  /** カスタムの設定（4つの難易度では null） */
+  readonly custom: CustomSettings | null;
+  private readonly speedMult: number;
+  private readonly scoreMult: number;
 
-  constructor(seed: number, difficulty: Difficulty = 'normal', cfg: GameConfig = DEFAULT_CONFIG) {
+  constructor(seed: number, difficulty: PlayMode = 'normal', cfg: GameConfig = DEFAULT_CONFIG, custom?: CustomSettings) {
+    if (difficulty === 'custom' && !custom) throw new Error('カスタムには設定が必要');
     this.cfg = cfg;
     this.d = derive(cfg);
     this.difficulty = difficulty;
-    this.spawner = new Spawner(cfg, new Rng(mixSeed(seed, difficulty)), difficulty);
-    this.speed = speedFor(0, cfg, this.d.baseSpeed);
+    this.custom = difficulty === 'custom' ? custom! : null;
+    this.speedMult = this.custom ? this.custom.speed : 1;
+    this.scoreMult = difficulty === 'custom' ? 1 : DIFFICULTIES[difficulty].scoreMult;
+    this.spawner = new Spawner(cfg, new Rng(mixSeed(seed, difficulty)), difficulty, this.custom ?? undefined);
+    this.speed = this.speedAt(0);
+  }
+
+  /**
+   * n 番目の出土品のときの速さ。カスタムでは設定の倍率をかけ、速度アップ OFF なら最初の速さのまま（詳細設計 19.3）。
+   * 4つの難易度では倍率1で、今までと同じ値になる。
+   */
+  private speedAt(n: number): number {
+    return speedFor(this.rampN(n), this.cfg, this.d.baseSpeed) * this.speedMult;
+  }
+
+  /** 速度アップ OFF のカスタムでは、速さと間隔の計算で「何個目か」を常に0とみなす */
+  private rampN(n: number): number {
+    return this.custom && !this.custom.speedUp ? 0 : n;
   }
 
   /** 出土品の中心 y */
@@ -128,8 +151,8 @@ export class Game {
     this.D = Math.max(this.D, this.nextSpawnD);
     this.items.push(item);
     this.spawnedCount++;
-    this.speed = speedFor(n, cfg, this.d.baseSpeed);
-    this.nextSpawnD = item.spawnD + spacingFor(n, cfg, this.d.baseSpeed);
+    this.speed = this.speedAt(n);
+    this.nextSpawnD = item.spawnD + spacingFor(this.rampN(n), cfg, this.d.baseSpeed);
     this.anchor();
     this.events.push({ type: 'spawn', t: this.time, item });
     if (n > 0 && this.spawner.variantCount(n) > this.spawner.variantCount(n - 1)) {
@@ -173,7 +196,7 @@ export class Game {
       this.combo++;
       if (this.combo > this.maxCombo) this.maxCombo = this.combo;
       const mult = multiplierFor(this.combo, this.cfg);
-      const points = pointsFor(this.combo, this.cfg, DIFFICULTIES[this.difficulty].scoreMult);
+      const points = pointsFor(this.combo, this.cfg, this.scoreMult);
       this.score += points;
       this.correct++;
       this.events.push({ type: 'correct', t: this.time, item, y, side, points, mult, combo: this.combo });

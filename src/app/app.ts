@@ -1,5 +1,6 @@
 import { Sfx } from '../audio/sfx';
-import { DEFAULT_CONFIG, DIFFICULTIES, DIFFICULTY_ORDER, isDifficulty, type Difficulty, type GameConfig } from '../core/config';
+import { DEFAULT_CONFIG, DIFFICULTIES, DIFFICULTY_ORDER, isDifficulty, type GameConfig, type PlayMode } from '../core/config';
+import { CUSTOM_NAME, clampSpeed, normalizeCustom, type CustomSettings } from '../core/custom';
 import { interpolate } from '../core/difficulty';
 import { Game } from '../core/game';
 import { InputArbiter } from '../core/inputArbiter';
@@ -12,13 +13,17 @@ import { RankingClient } from '../net/ranking';
 import { Effects } from '../render/effects';
 import { Renderer } from '../render/renderer';
 import { Hud } from '../ui/hud';
+import { CustomUi } from '../ui/customUi';
 import { RankingUi } from '../ui/rankingUi';
 import { Screens } from '../ui/screens';
 import { GameClock } from './clock';
 import { computeLayout, decideMode, type Layout, type Mode } from './layout';
 import { load, save, type SaveData } from './storage';
 
-type Scene = 'title' | 'difficulty' | 'howto' | 'playing' | 'paused' | 'ending' | 'result' | 'ranking';
+type Scene = 'title' | 'difficulty' | 'custom' | 'howto' | 'playing' | 'paused' | 'ending' | 'result' | 'ranking';
+
+/** 難易度を選ぶ画面の並び（4つの難易度＋カスタム。詳細設計 19.4） */
+const MODE_ORDER: readonly PlayMode[] = [...DIFFICULTY_ORDER, 'custom'];
 
 const COLOR_GOOD = '#f4d27a';
 const COLOR_BAD = '#ff6b62';
@@ -40,6 +45,7 @@ export class App {
   private rankingReturn: Scene = 'title';
   private ranking = new RankingClient();
   private rankingUi: RankingUi;
+  private customUi: CustomUi;
   /** 今のゲームの整理券（なければランキングに登録できない） */
   private runToken: string | null = null;
   private mode: Mode = 'desktop';
@@ -81,6 +87,14 @@ export class App {
         save(this.data);
       },
       openRanking: () => this.action('ranking'),
+    });
+    this.customUi = new CustomUi({
+      get: () => this.data.custom,
+      set: (c) => {
+        this.data.custom = normalizeCustomKeepEmpty(c);
+        save(this.data);
+      },
+      start: () => this.start('custom'),
     });
     this.ranking.prefetchRun();
 
@@ -148,6 +162,11 @@ export class App {
       this.difficultyKey(code);
       return;
     }
+    if (s === 'custom') {
+      if (code === 'Enter' && this.customUi.canStart()) this.start('custom');
+      else if (code === 'Escape') this.action('custom-back');
+      return;
+    }
     if (code === 'Space') {
       if (s === 'title') this.openDifficulty();
       else if (s === 'playing') this.pause();
@@ -165,17 +184,17 @@ export class App {
     }
   }
 
-  /** 難易度を選ぶ画面のキー操作（詳細設計 17.6、R14） */
+  /** 難易度を選ぶ画面のキー操作（詳細設計 17.6・19.4、R14） */
   private difficultyKey(code: string): void {
-    const i = DIFFICULTY_ORDER.indexOf(this.data.lastDifficulty);
+    const i = Math.max(0, MODE_ORDER.indexOf(this.data.lastMode));
     if (code === 'ArrowUp' || code === 'ArrowDown') {
-      const n = DIFFICULTY_ORDER.length;
-      this.data.lastDifficulty = DIFFICULTY_ORDER[(i + (code === 'ArrowUp' ? n - 1 : 1)) % n]!;
-      this.screens.selectDifficulty(this.data.lastDifficulty);
+      const n = MODE_ORDER.length;
+      this.data.lastMode = MODE_ORDER[(i + (code === 'ArrowUp' ? n - 1 : 1)) % n]!;
+      this.screens.selectDifficulty(this.data.lastMode);
     } else if (code === 'Enter' || code === 'Space') {
-      this.action(`diff:${this.data.lastDifficulty}`);
-    } else if (/^Digit[1-4]$/.test(code)) {
-      this.action(`diff:${DIFFICULTY_ORDER[Number(code.slice(5)) - 1]}`);
+      this.action(`diff:${this.data.lastMode}`);
+    } else if (/^Digit[1-5]$/.test(code)) {
+      this.action(`diff:${MODE_ORDER[Number(code.slice(5)) - 1]}`);
     } else if (code === 'Escape') {
       this.action('diff-back');
     }
@@ -183,18 +202,31 @@ export class App {
 
   private openDifficulty(): void {
     this.scene = 'difficulty';
-    this.screens.selectDifficulty(this.data.lastDifficulty);
+    this.screens.selectDifficulty(this.data.lastMode);
     this.screens.show('difficulty');
+  }
+
+  private openCustom(): void {
+    this.data.lastMode = 'custom';
+    save(this.data);
+    this.scene = 'custom';
+    this.customUi.open();
+    this.screens.show('custom');
   }
 
   private action(act: string): void {
     this.sfx.unlock();
     if (act.startsWith('diff:')) {
       const d = act.slice(5);
-      if (this.scene === 'difficulty' && isDifficulty(d)) this.start(d);
+      if (this.scene !== 'difficulty') return;
+      if (d === 'custom') this.openCustom();
+      else if (isDifficulty(d)) this.start(d);
       return;
     }
     switch (act) {
+      case 'custom-back':
+        if (this.scene === 'custom') this.openDifficulty();
+        break;
       case 'start':
         this.openDifficulty();
         break;
@@ -226,7 +258,7 @@ export class App {
         this.scene = 'ranking';
         this.screens.show('ranking');
         // タイトルからは「すべて」、リザルトからはそのプレイの難易度で開く（詳細設計 17.11）
-        this.rankingUi.openScreen(this.rankingReturn === 'result' && this.game ? this.game.difficulty : 'all');
+        this.rankingUi.openScreen(this.rankingReturn === 'result' && this.game && this.game.difficulty !== 'custom' ? this.game.difficulty : 'all');
         break;
       case 'rank-back':
         if (this.scene !== 'ranking') break;
@@ -243,20 +275,28 @@ export class App {
   }
 
   // ===== 進行 =====
-  /** ゲームを始める（リトライは同じ難易度。D-34） */
-  private start(difficulty: Difficulty): void {
+  /** ゲームを始める（リトライは同じ難易度・同じカスタム設定。D-34・D-51） */
+  private start(difficulty: PlayMode): void {
     this.sfx.unlock();
-    if (difficulty !== this.data.lastDifficulty) {
-      this.data.lastDifficulty = difficulty;
+    if (difficulty !== this.data.lastMode || (difficulty !== 'custom' && difficulty !== this.data.lastDifficulty)) {
+      this.data.lastMode = difficulty;
+      if (difficulty !== 'custom') this.data.lastDifficulty = difficulty;
       save(this.data);
     }
     clearTimeout(this.endingTimer);
     this.rankingUi.leaveResult();
-    // ランキング用の整理券があればその種で遊ぶ。なければ登録できないプレイになる（16.4）
-    const run = this.seedParam === null ? this.ranking.takeRun() : null;
-    this.runToken = run?.token ?? null;
-    this.game = new Game(this.seedParam ?? run?.seed ?? randomSeed(), difficulty, this.cfg);
-    this.hud.setDifficulty(DIFFICULTIES[difficulty].name, difficulty);
+    if (difficulty === 'custom') {
+      // カスタムはランキングに使わないので、整理券は次の4つの難易度のゲームのために残す（詳細設計 19.6）
+      this.runToken = null;
+      this.game = new Game(this.seedParam ?? randomSeed(), 'custom', this.cfg, normalizeCustom(this.data.custom));
+      this.hud.setDifficulty(CUSTOM_NAME, 'custom');
+    } else {
+      // ランキング用の整理券があればその種で遊ぶ。なければ登録できないプレイになる（16.4）
+      const run = this.seedParam === null ? this.ranking.takeRun() : null;
+      this.runToken = run?.token ?? null;
+      this.game = new Game(this.seedParam ?? run?.seed ?? randomSeed(), difficulty, this.cfg);
+      this.hud.setDifficulty(DIFFICULTIES[difficulty].name, difficulty);
+    }
     this.clock.start(performance.now());
     this.arbiter.reset();
     this.fx.clear();
@@ -326,6 +366,19 @@ export class App {
     if (!this.game) return;
     const s = this.game.stats();
     const diff = this.game.difficulty;
+    if (diff === 'custom') {
+      // カスタム：自己ベストを記録せず、ランキングの確認・登録もしない（D-50、詳細設計 19.6）
+      this.screens.fillResult(s, null, false, 'custom');
+      this.scene = 'result';
+      this.screens.show('result');
+      this.rankingUi.hideResult();
+      this.runToken = null;
+      this.ranking.prefetchRun();
+      this.retryLockUntil = performance.now() + this.cfg.retryLockSec * 1000;
+      this.screens.setRetryEnabled(false);
+      window.setTimeout(() => this.screens.setRetryEnabled(true), this.cfg.retryLockSec * 1000);
+      return;
+    }
     const isNew = s.score > this.data.best[diff];
     if (isNew) {
       this.data.best[diff] = s.score;
@@ -463,4 +516,10 @@ export class App {
         : 'no game',
     ].join('\n');
   }
+}
+
+/** 保存用：選んだものが空でも空のまま残す（1つも選んでいない状態を画面で見せるため。始めるときは normalizeCustom で整える） */
+function normalizeCustomKeepEmpty(c: CustomSettings): CustomSettings {
+  if (c.variants.length) return normalizeCustom(c);
+  return { variants: [], speed: clampSpeed(c.speed), speedUp: c.speedUp };
 }

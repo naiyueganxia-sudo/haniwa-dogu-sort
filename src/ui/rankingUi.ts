@@ -115,6 +115,12 @@ export class RankingUi {
   }
 
   /** リトライ・タイトルへ移ったとき（そのプレイは後から登録できない） */
+  /** カスタムの結果画面：登録欄を出さない（D-50） */
+  hideResult(): void {
+    this.leaveResult();
+    this.reg.hidden = true;
+  }
+
   leaveResult(): void {
     this.gen++;
     this.ctx = null;

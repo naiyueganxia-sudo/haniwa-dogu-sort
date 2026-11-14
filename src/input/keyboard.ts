@@ -12,7 +12,7 @@ const SORT_KEYS: Record<string, Side> = { KeyA: 'L', ArrowLeft: 'L', KeyD: 'R', 
 const COMMAND_KEYS = new Set([
   'Space', 'Escape', 'Enter', 'NumpadEnter', 'KeyR',
   // 難易度を選ぶ画面（詳細設計 17.6）
-  'ArrowUp', 'ArrowDown', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Numpad1', 'Numpad2', 'Numpad3', 'Numpad4',
+  'ArrowUp', 'ArrowDown', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Numpad1', 'Numpad2', 'Numpad3', 'Numpad4', 'Numpad5',
 ]);
 const BLOCK_DEFAULT = new Set(['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']);
 

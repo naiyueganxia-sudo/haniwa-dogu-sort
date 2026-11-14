@@ -1,4 +1,5 @@
-import { DIFFICULTY_ORDER, isDifficulty, type Difficulty } from '../core/config';
+import { DIFFICULTY_ORDER, isDifficulty, type Difficulty, type PlayMode } from '../core/config';
+import { defaultCustom, normalizeCustom, type CustomSettings } from '../core/custom';
 
 /**
  * 自己ベスト（難易度ごと）・前回の難易度・音の設定・前回の名前の保存
@@ -14,6 +15,10 @@ export interface SaveData {
   muted: boolean;
   /** ランキングに前回登録した名前（D-24 案B） */
   lastName: string;
+  /** カスタムの設定（D-51、詳細設計 19.5） */
+  custom: CustomSettings;
+  /** 最後に選んだもの（4つの難易度かカスタム）。難易度を選ぶ画面で最初に光らせる */
+  lastMode: PlayMode;
 }
 
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : 0);
@@ -23,7 +28,7 @@ function emptyBest(): Record<Difficulty, number> {
 }
 
 export function load(): SaveData {
-  const def: SaveData = { best: emptyBest(), lastDifficulty: 'normal', muted: false, lastName: '' };
+  const def: SaveData = { best: emptyBest(), lastDifficulty: 'normal', muted: false, lastName: '', custom: defaultCustom(), lastMode: 'normal' };
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return def;
@@ -34,11 +39,14 @@ export function load(): SaveData {
     }
     // 難易度を追加する前の自己ベストは「ふつう」に引き継ぐ（D-33）
     if (v.bestScore !== undefined) best.normal = Math.max(best.normal, num(v.bestScore));
+    const lastDifficulty = isDifficulty(v.lastDifficulty) ? v.lastDifficulty : 'normal';
     return {
       best,
-      lastDifficulty: isDifficulty(v.lastDifficulty) ? v.lastDifficulty : 'normal',
+      lastDifficulty,
       muted: v.muted === true,
       lastName: typeof v.lastName === 'string' ? v.lastName.slice(0, 40) : '',
+      custom: normalizeCustom(v.custom),
+      lastMode: v.lastMode === 'custom' || isDifficulty(v.lastMode) ? v.lastMode : lastDifficulty,
     };
   } catch {
     return def;

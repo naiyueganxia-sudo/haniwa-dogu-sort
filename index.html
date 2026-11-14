@@ -60,7 +60,31 @@
         <h2>難易度を選ぶ</h2>
         <div id="diff-list" class="diff-list"></div>
         <button class="btn" data-act="diff-back">もどる</button>
-        <p class="hint-keys only-desktop">↑↓ で選んで Enter ／ 1〜4 キー ／ Esc でもどる</p>
+        <p class="hint-keys only-desktop">↑↓ で選んで Enter ／ 1〜5 キー ／ Esc でもどる</p>
+      </div>
+    </section>
+
+    <!-- カスタム設定（詳細設計 19.4） -->
+    <section id="scr-custom" class="screen" hidden>
+      <div class="panel wide cus-panel">
+        <h2>カスタム <span class="diff-tag" data-diff="custom">ランキング対象外</span></h2>
+        <div class="cus-block">
+          <div class="cus-speed-row">
+            <span class="cus-label">速度</span>
+            <button type="button" class="btn small cus-step" id="cus-slower" aria-label="遅くする">−</button>
+            <input type="range" id="cus-speed" aria-label="速度" />
+            <button type="button" class="btn small cus-step" id="cus-faster" aria-label="速くする">＋</button>
+          </div>
+          <p class="cus-speed-text" id="cus-speed-text">×1.0（ふつう）</p>
+          <label class="cus-toggle"><input type="checkbox" id="cus-speedup" /> <span><b>速度アップ</b> <small>遊ぶほど間隔が詰まり、速くなる</small></span></label>
+        </div>
+        <div class="cus-block" id="cus-haniwa"></div>
+        <div class="cus-block" id="cus-dogu"></div>
+        <p class="cus-ratio" id="cus-ratio"></p>
+        <button type="button" class="btn primary" id="cus-start">スタート</button>
+        <button type="button" class="btn" id="cus-reset">初期設定に戻す</button>
+        <button class="btn" data-act="custom-back">もどる</button>
+        <p class="hint-keys only-desktop">Enter でスタート ／ Esc でもどる</p>
       </div>
     </section>
 
@@ -80,6 +104,7 @@
           <li>連続で正解するとコンボ。コンボが続くほど得点が増えます（10コンボ ×1.2 ／ 20 ×1.5 ／ 40 ×2.0 ／ 70 ×2.5 ／ 100 ×3.0）。</li>
           <li>進むほど出土品が多く、速くなります。</li>
           <li>難易度で、出てくる出土品の種類の数と点数の倍率が変わります（かんたん ×0.5／ふつう ×1.0／むずかしい ×1.5／激むず ×2.0）。遊んでいるうちに種類が増えていきます。</li>
+          <li>カスタム：出てくる出土品や速さを自分で決めて遊べます（ランキングには載りません）。</li>
         </ul>
         <p class="note">絵の下の札は、その出土品が出てくる難易度です（「ふつう〜」なら、ふつう・むずかしい・激むずで出ます）。</p>
         <h3>はにわ（古墳時代）</h3>

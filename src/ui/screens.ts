@@ -1,13 +1,15 @@
-import { DIFFICULTIES, DIFFICULTY_ORDER, type Difficulty } from '../core/config';
+import { DIFFICULTIES, DIFFICULTY_ORDER, type Difficulty, type PlayMode } from '../core/config';
+import { CUSTOM_NAME } from '../core/custom';
 import type { Stats } from '../core/types';
 import { ARTIFACTS, firstDifficultyOf } from '../data/artifacts';
 import { drawArtifact } from '../render/art';
 
-export type ScreenName = 'title' | 'difficulty' | 'howto' | 'pause' | 'ending' | 'result' | 'ranking';
+export type ScreenName = 'title' | 'difficulty' | 'custom' | 'howto' | 'pause' | 'ending' | 'result' | 'ranking';
 
 const IDS: Record<ScreenName, string> = {
   title: 'scr-title',
   difficulty: 'scr-difficulty',
+  custom: 'scr-custom',
   howto: 'scr-howto',
   pause: 'scr-pause',
   ending: 'scr-ending',
@@ -33,6 +35,7 @@ export class Screens {
     (document.activeElement as HTMLElement | null)?.blur?.();
     for (const [k, id] of Object.entries(IDS)) document.getElementById(id)!.hidden = k !== name;
     if (name === 'howto') document.getElementById('scr-howto')!.scrollTop = 0;
+    if (name === 'custom') document.getElementById('scr-custom')!.scrollTop = 0;
   }
 
   setMuted(muted: boolean): void {
@@ -46,11 +49,12 @@ export class Screens {
   }
 
   /** 難易度を選ぶ画面で、選んでいる難易度に枠を付ける */
-  selectDifficulty(diff: Difficulty): void {
+  selectDifficulty(diff: PlayMode): void {
     document.querySelectorAll<HTMLElement>('.diff-btn').forEach((b) => b.classList.toggle('selected', b.dataset.diff === diff));
   }
 
-  fillResult(s: Stats, best: number, isNew: boolean, diff: Difficulty): void {
+  /** best が null ならカスタム（自己ベストを記録しない。D-50） */
+  fillResult(s: Stats, best: number | null, isNew: boolean, diff: PlayMode): void {
     const set = (id: string, v: string) => (document.getElementById(id)!.textContent = v);
     setDiffTag(document.getElementById('r-diff')!, diff);
     set('r-score', s.score.toLocaleString('ja-JP'));
@@ -62,7 +66,7 @@ export class Screens {
     set('r-acc', s.accuracy === null ? '—' : `${(s.accuracy * 100).toFixed(1)}%`);
     const sec = Math.floor(s.playTimeSec);
     set('r-time', `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`);
-    set('r-best', best.toLocaleString('ja-JP'));
+    set('r-best', best === null ? '—（ランキング対象外）' : best.toLocaleString('ja-JP'));
   }
 
   setRetryEnabled(on: boolean): void {
@@ -90,6 +94,22 @@ export class Screens {
       b.append(key, name, info);
       box.append(b);
     });
+    // カスタム（詳細設計 19.4）
+    const b = document.createElement('button');
+    b.className = 'btn diff-btn';
+    b.dataset.act = 'diff:custom';
+    b.dataset.diff = 'custom';
+    const key = document.createElement('span');
+    key.className = 'hint-keys only-desktop';
+    key.textContent = '5';
+    const name = document.createElement('span');
+    name.className = 'diff-name';
+    name.textContent = CUSTOM_NAME;
+    const info = document.createElement('span');
+    info.className = 'diff-info';
+    info.append('自分で決める', document.createElement('br'), 'ランキング対象外');
+    b.append(key, name, info);
+    box.append(b);
   }
 
   private buildGallery(): void {
@@ -127,7 +147,7 @@ export class Screens {
 }
 
 /** 難易度の札（色と文字。詳細設計 17.6、R15） */
-export function setDiffTag(el: HTMLElement, diff: Difficulty, text = DIFFICULTIES[diff].name): void {
+export function setDiffTag(el: HTMLElement, diff: PlayMode, text = diff === 'custom' ? CUSTOM_NAME : DIFFICULTIES[diff].name): void {
   el.classList.add('diff-tag');
   el.dataset.diff = diff;
   el.textContent = text;
